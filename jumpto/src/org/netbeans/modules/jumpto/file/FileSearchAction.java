@@ -244,6 +244,7 @@ public class FileSearchAction extends AbstractAction implements FileSearchPanel.
             if (currentSearch.isNarrowing(searchType, text, null, true)) {
                 itemsComparator.setUsePreferred(panel.isPreferedProject());
                 filterFactory.setLineNumber(lineNr);
+                //TODO: EMI: searchByFolder?
                 currentSearch.filter(
                         searchType,
                         text,
@@ -292,6 +293,7 @@ public class FileSearchAction extends AbstractAction implements FileSearchPanel.
             searchText,
             slidingTaskData.kind,
             panel.getCurrentProject(),
+            panel.isSearchByFolders(),
             slidingTaskData.lineNo);
         final Worker.Collector collector = Worker.newCollector(
                 baseListModel,
