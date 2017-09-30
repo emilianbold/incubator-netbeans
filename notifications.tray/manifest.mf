@@ -1,0 +1,8 @@
+Manifest-Version: 1.0
+AutoUpdate-Show-In-Client: true
+OpenIDE-Module: org.netbeans.modules.notifications.tray
+OpenIDE-Module-Install: org/netbeans/modules/notifications/tray/Installer.class
+OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/notifications/tray/Bundle.properties
+OpenIDE-Module-Specification-Version: 1.0
+AutoUpdate-Essential-Module: true
+
