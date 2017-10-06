@@ -1,48 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Search for CHANGEME in this document when copying and using it: -->
 <!--
-DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
 
-Copyright 1997-2010 Oracle and/or its affiliates. All rights reserved.
+ http://www.apache.org/licenses/LICENSE-2.0
 
-Oracle and Java are registered trademarks of Oracle and/or its affiliates.
-Other names may be trademarks of their respective owners.
-
-
-The contents of this file are subject to the terms of either the GNU
-General Public License Version 2 only ("GPL") or the Common
-Development and Distribution License("CDDL") (collectively, the
-"License"). You may not use this file except in compliance with the
-License. You can obtain a copy of the License at
-http://www.netbeans.org/cddl-gplv2.html
-or nbbuild/licenses/CDDL-GPL-2-CP. See the License for the
-specific language governing permissions and limitations under the
-License.  When distributing the software, include this License Header
-Notice in each file and include the License file at
-nbbuild/licenses/CDDL-GPL-2-CP.  Oracle designates this
-particular file as subject to the "Classpath" exception as provided
-by Oracle in the GPL Version 2 section of the License file that
-accompanied this code. If applicable, add the following below the
-License Header, with the fields enclosed by brackets [] replaced by
-your own identifying information:
-"Portions Copyrighted [year] [name of copyright owner]"
-
-Contributor(s):
-
-The Original Software is NetBeans. The Initial Developer of the Original
-Software is Sun Microsystems, Inc. Portions Copyright 1997-2006 Sun
-Microsystems, Inc. All Rights Reserved.
-
-If you wish your version of this file to be governed by only the CDDL
-or only the GPL Version 2, indicate your decision by adding
-"[Contributor] elects to include this software in this distribution
-under the [CDDL or GPL Version 2] license." If you do not indicate a
-single choice of license, a recipient has the option to distribute
-your version of this file under either the CDDL, the GPL Version 2 or
-to extend the choice of license to its licensees as provided above.
-However, if you add GPL Version 2 code and therefore, elected the GPL
-Version 2 license, then the option applies only if the new code is
-made subject to such option by the copyright holder.
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
 -->
 <?xml-stylesheet type="text/xml" href="../nbbuild/javadoctools/apichanges.xsl"?>
 <!DOCTYPE apichanges PUBLIC "-//NetBeans//DTD API changes list 1.0//EN" "../nbbuild/javadoctools/apichanges.dtd">
@@ -108,7 +82,7 @@ is the proper place.
     <!-- ACTUAL CHANGES BEGIN HERE: -->
 
     <changes>
-        
+
         <change>
             <api name="versioning_spi"/>
             <summary>Support ContextAwareActions</summary>
@@ -122,7 +96,7 @@ is the proper place.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VCSVisibilityQuery"/>
             <issue number="221831"/>
-        </change>                
+        </change>
         <change>
             <api name="versioning_spi"/>
             <summary>Support ContextAwareActions</summary>
@@ -131,13 +105,13 @@ is the proper place.
             <author login="tstupka"/>
             <compatibility addition="yes"/>
             <description>
-                Ensure that <code>ContextAwareAction</code>-s provided via <code>VCSHistoryProvider.HistoryEntry.getActions()</code> 
-                are created with a context containing the selected nodes in a files editor history tab. Those nodes than will have 
+                Ensure that <code>ContextAwareAction</code>-s provided via <code>VCSHistoryProvider.HistoryEntry.getActions()</code>
+                are created with a context containing the selected nodes in a files editor history tab. Those nodes than will have
                 the relevant <code>HistoryEntry</code> and files in their lookup.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VCSHistoryProvider"/>
             <issue number="210691"/>
-        </change>                
+        </change>
         <change>
             <api name="versioning_spi"/>
             <summary>Added VCSHistoryProvider.HistoryEntry.getParent()</summary>
@@ -146,12 +120,12 @@ is the proper place.
             <author login="tstupka"/>
             <compatibility addition="yes"/>
             <description>
-                New method <code>VCSHistoryProvider.HistoryEntry.getParent()</code> to provide the 
+                New method <code>VCSHistoryProvider.HistoryEntry.getParent()</code> to provide the
                 <code>VCSHistoryProvider.HistoryEntry</code> representing the parent of the given revision.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VCSHistoryProvider"/>
             <issue number="209673"/>
-        </change>                
+        </change>
         <change>
             <api name="versioning_spi"/>
             <summary>Added VCSHistoryProvider</summary>
@@ -160,7 +134,7 @@ is the proper place.
             <author login="tstupka"/>
             <compatibility addition="yes"/>
             <description>
-                New type <code>VCSHistoryProvider</code> makes it possible for versionig systems to 
+                New type <code>VCSHistoryProvider</code> makes it possible for versionig systems to
                 provide information about a files history which is then used in that files editor history tab.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VersioningSupport"/>
@@ -174,7 +148,7 @@ is the proper place.
             <author login="ovrabec"/>
             <compatibility addition="yes"/>
             <description>
-                Method <code>isExcluded</code> states that a given folder is excluded from version control completely. 
+                Method <code>isExcluded</code> states that a given folder is excluded from version control completely.
                 All version control systems should respect the return value and consider such folders to be unversioned.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VersioningSupport"/>
@@ -188,7 +162,7 @@ is the proper place.
             <author login="tstupka"/>
             <compatibility addition="yes"/>
             <description>
-                Register a VCS System via the <code>@VersioningSystem.Registration</code> 
+                Register a VCS System via the <code>@VersioningSystem.Registration</code>
                 instead of <code>@ServiceProvider</code>.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VersioningSystem"/>
@@ -218,7 +192,7 @@ is the proper place.
             <compatibility addition="yes"/>
             <description>
                 <code>VCSInterceptor.refreshRecursively</code> allows a version control system to get better control on behavior of recursive listener.
-                With this method a versioning system can disable recursive listening on specific folders (e.g. versioning system metadata) and on the other hand 
+                With this method a versioning system can disable recursive listening on specific folders (e.g. versioning system metadata) and on the other hand
                 learn about and handle external changes inside the folder in its own way.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VCSInterceptor"/>
@@ -252,7 +226,7 @@ is the proper place.
             <compatibility addition="yes"/>
             <description>
                 New method getAttribute(File file, String attrName). Provides additional VCS specific information
-                about versioned files. The only supported attribute at this moment is 
+                about versioned files. The only supported attribute at this moment is
                 "ProvidedExtensions.RemoteLocation" for which VCS systems
                 overrinding getAttribute should return the files remote repository, resp. remote origin.
                 (e.g. Repository URL in case of SVN or default pull in case of Mercurial).
@@ -322,7 +296,7 @@ is the proper place.
                 a chance to check-out a file in the beforeEdit() callback.
             </description>
         </change>
-        
+
         <change>
             <api name="versioning_spi"/>
             <summary>Initial version of SPI released</summary>
