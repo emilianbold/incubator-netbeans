@@ -16,7 +16,6 @@ specific language governing permissions and limitations
 under the License.
 
 
-
 Branch created from: editor_settings_90403_base
 Last update from trunk (rebased to): before_hg
 Last merge to trunk (delivered from): editor_settings_90403_delivery_3
