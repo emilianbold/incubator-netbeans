@@ -14,9 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
-# The format should handle comments
-# And also empty lines
+
 run:
                                  -- Running tests --
                                  -- /space/sources/tng_fork/target/testng-6.3.2beta.jar --
