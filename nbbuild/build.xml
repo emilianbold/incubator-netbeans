@@ -1950,7 +1950,7 @@ It is possible to use -Ddebug.port=3234 -Ddebug.pause=y to start the system in d
             <fileset dir="${nb_all}">
                 <exclude name="*/build/**" />
                 <exclude name="nbbuild/netbeans/**" />
-                <exclude name="**/manifest.mf" /> <!--do not nativelly support comments-->
+                <exclude name="**/*.mf" /> <!--do not nativelly support comments-->
                 <exclude name="*/nbproject/*.sig" /> <!--generated signatures for past versions-->
                 <exclude name="*/nbproject/build-impl.xml" /> <!--generated, no degree of creativity -->
                 <exclude name="*/nbproject/jfx-impl.xml" /> <!--generated, no degree of creativity -->
@@ -1960,12 +1960,37 @@ It is possible to use -Ddebug.port=3234 -Ddebug.pause=y to start the system in d
                 <exclude name="*/external/*-notice.txt" /> <!--notices for external dependencies-->
                 <exclude name="**/*.pass" /> <!--generated test files-->
                 <exclude name="**/*.pass2" /> <!--generated test files-->
+                <exclude name="**/*.ref" /> <!--would cause tests to fail-->
                 <exclude name="**/.list" /> <!--no degree of creativity-->
                 <exclude name="**/src/META-INF/**" /> <!--no degree of creativity-->
                 <exclude name="form/test/unit/data/goldenfiles/*" /> <!--test data-->
                 <exclude name="diff/test/unit/data/**" /> <!--test data-->
                 <exclude name="diff/test/unit/src/org/netbeans/modules/diff/builtin/provider/*.txt" /> <!--test data-->
                 <exclude name="diff/test/unit/src/org/netbeans/modules/diff/builtin/visualizer/data/**" /> <!--test data-->
+                <exclude name="javafx2.project/src/org/netbeans/modules/javafx2/project/templates/**" /> <!--license would be visible when users edit the templates inside their IDE-->
+                <exclude name="utilities/test/unit/src/org/netbeans/modules/openfile/resources/recent_files/*" /> <!--test data-->
+                <exclude name="**/*.url" /> <!--no degree of creativity-->
+                <exclude name="spi.navigator/test/unit/src/org/netbeans/modules/navigator/resources/lastsel/file.lastsel_mime1" /> <!--empty file-->    
+                <exclude name="templates/src/org/netbeans/modules/templates/resources/userprop.txt" /> <!--no degree of creativity-->
+                <exclude name="api.search/test/unit/data/textFiles/utf8file.txt" /> <!--test data-->
+                <exclude name="api.search/test/unit/src/org/netbeans/modules/search/data/**" /> <!--test data-->
+                <exclude name="beans/src/org/netbeans/modules/beans/resources/templates/*.template" /> <!--license would be visible when users edit the templates inside their IDE-->
+                <exclude name="editor.settings.storage/test/unit/src/org/netbeans/modules/editor/settings/storage/compatibility/p1/**" /> <!--test data-->
+                <exclude name="editor.plain/src/org/netbeans/modules/editor/plain/resources/PlainTextExample" /> <!--license would be visible to users in the Fonts/Colors settings-->
+                <exclude name="editor.fold/test/unit/data/goldenfiles/hierarchy/update-hierarchy.folds" /> <!--test data-->
+                <exclude name="editor.fold/test/unit/data/hierarchy/update-hierarchy.folds" /> <!--test data-->
+                <exclude name="editor.fold/test/unit/src/org/netbeans/modules/editor/fold/FoldContentReader.txt" /> <!--test data-->
+                <exclude name="libs.freemarker/test/unit/data/**" /> <!--test data-->
+                <exclude name="languages.yaml/src/org/netbeans/modules/languages/yaml/*.yml" /> <!--Files used in GUI as sample/starting point-->
+                <exclude name="languages.yaml/src/org/netbeans/modules/languages/yaml/*.yaml" /> <!--Files used in GUI as sample/starting point-->
+                <exclude name="languages.yaml/test/unit/data/testfiles/*" /> <!--test data-->
+                <exclude name="versioning.core/test/unit/data/workdir/root/a.txt" /> <!--test data-->
+                <exclude name="versioning.core/test/unit/data/workdir/root-test-versioned/**" /> <!--test data-->
+                <exclude name="versioning.core/test/unit/data/workdir/root-with-exclusions/**" /> <!--test data-->
+                <exclude name="versioning/test/unit/data/workdir/root/a.txt" /> <!--test data-->
+                <exclude name="versioning/test/unit/data/workdir/root-test-versioned/**" /> <!--test data-->
+                <exclude name="versioning/test/unit/data/workdir/root-with-exclusions/**" /> <!--test data-->
+                <exclude name="testng.ui/src/org/netbeans/modules/testng/ui/resources/*.template" /> <!--template files-->
             </fileset>
         </rat:report>
     </target>
