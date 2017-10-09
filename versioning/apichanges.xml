@@ -164,7 +164,7 @@ is the proper place.
             <author login="tstupka"/>
             <compatibility addition="yes"/>
             <description>
-                Register a VCS System via the <code>@VersioningSystem.Registration</code>
+                Register a VCS System via the <code>@VersioningSystem.Registration</code> 
                 instead of <code>@ServiceProvider</code>.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VersioningSystem"/>
@@ -298,7 +298,7 @@ is the proper place.
                 a chance to check-out a file in the beforeEdit() callback.
             </description>
         </change>
-                
+        
         <change>
             <api name="versioning_spi"/>
             <summary>Initial version of SPI released</summary>
