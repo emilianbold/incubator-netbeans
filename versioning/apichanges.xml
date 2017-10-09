@@ -84,7 +84,7 @@ is the proper place.
     <!-- ACTUAL CHANGES BEGIN HERE: -->
 
     <changes>
-
+        
         <change>
             <api name="versioning_spi"/>
             <summary>Support ContextAwareActions</summary>
@@ -98,7 +98,7 @@ is the proper place.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VCSVisibilityQuery"/>
             <issue number="221831"/>
-        </change>
+        </change>                
         <change>
             <api name="versioning_spi"/>
             <summary>Support ContextAwareActions</summary>
@@ -107,13 +107,13 @@ is the proper place.
             <author login="tstupka"/>
             <compatibility addition="yes"/>
             <description>
-                Ensure that <code>ContextAwareAction</code>-s provided via <code>VCSHistoryProvider.HistoryEntry.getActions()</code>
-                are created with a context containing the selected nodes in a files editor history tab. Those nodes than will have
+                Ensure that <code>ContextAwareAction</code>-s provided via <code>VCSHistoryProvider.HistoryEntry.getActions()</code> 
+                are created with a context containing the selected nodes in a files editor history tab. Those nodes than will have 
                 the relevant <code>HistoryEntry</code> and files in their lookup.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VCSHistoryProvider"/>
             <issue number="210691"/>
-        </change>
+        </change>                
         <change>
             <api name="versioning_spi"/>
             <summary>Added VCSHistoryProvider.HistoryEntry.getParent()</summary>
@@ -122,12 +122,12 @@ is the proper place.
             <author login="tstupka"/>
             <compatibility addition="yes"/>
             <description>
-                New method <code>VCSHistoryProvider.HistoryEntry.getParent()</code> to provide the
+                New method <code>VCSHistoryProvider.HistoryEntry.getParent()</code> to provide the 
                 <code>VCSHistoryProvider.HistoryEntry</code> representing the parent of the given revision.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VCSHistoryProvider"/>
             <issue number="209673"/>
-        </change>
+        </change>                
         <change>
             <api name="versioning_spi"/>
             <summary>Added VCSHistoryProvider</summary>
@@ -136,7 +136,7 @@ is the proper place.
             <author login="tstupka"/>
             <compatibility addition="yes"/>
             <description>
-                New type <code>VCSHistoryProvider</code> makes it possible for versionig systems to
+                New type <code>VCSHistoryProvider</code> makes it possible for versionig systems to 
                 provide information about a files history which is then used in that files editor history tab.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VersioningSupport"/>
@@ -150,7 +150,7 @@ is the proper place.
             <author login="ovrabec"/>
             <compatibility addition="yes"/>
             <description>
-                Method <code>isExcluded</code> states that a given folder is excluded from version control completely.
+                Method <code>isExcluded</code> states that a given folder is excluded from version control completely. 
                 All version control systems should respect the return value and consider such folders to be unversioned.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VersioningSupport"/>
@@ -194,7 +194,7 @@ is the proper place.
             <compatibility addition="yes"/>
             <description>
                 <code>VCSInterceptor.refreshRecursively</code> allows a version control system to get better control on behavior of recursive listener.
-                With this method a versioning system can disable recursive listening on specific folders (e.g. versioning system metadata) and on the other hand
+                With this method a versioning system can disable recursive listening on specific folders (e.g. versioning system metadata) and on the other hand 
                 learn about and handle external changes inside the folder in its own way.
             </description>
             <class package="org.netbeans.modules.versioning.spi" name="VCSInterceptor"/>
@@ -228,7 +228,7 @@ is the proper place.
             <compatibility addition="yes"/>
             <description>
                 New method getAttribute(File file, String attrName). Provides additional VCS specific information
-                about versioned files. The only supported attribute at this moment is
+                about versioned files. The only supported attribute at this moment is 
                 "ProvidedExtensions.RemoteLocation" for which VCS systems
                 overrinding getAttribute should return the files remote repository, resp. remote origin.
                 (e.g. Repository URL in case of SVN or default pull in case of Mercurial).
@@ -298,7 +298,7 @@ is the proper place.
                 a chance to check-out a file in the beforeEdit() callback.
             </description>
         </change>
-
+                
         <change>
             <api name="versioning_spi"/>
             <summary>Initial version of SPI released</summary>
