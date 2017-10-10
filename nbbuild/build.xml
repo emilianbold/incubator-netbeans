@@ -1997,6 +1997,7 @@ It is possible to use -Ddebug.port=3234 -Ddebug.pause=y to start the system in d
                 <exclude name="testng.ui/src/org/netbeans/modules/testng/ui/resources/*.template" /> <!--template files-->
                 <exclude name="versioning.util/test/unit/data/historycache/*" /> <!--test data-->
                 <exclude name="java.lexer/test/unit/data/testfiles/*" /> <!--test data-->
+                <exclude name="selenium2.java/src/org/netbeans/modules/selenium2/java/SeleneseIT.java.template" /> <!--template file-->
             </fileset>
         </rat:report>
     </target>
