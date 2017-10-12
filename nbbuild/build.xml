@@ -2044,6 +2044,19 @@ It is possible to use -Ddebug.port=3234 -Ddebug.pause=y to start the system in d
                 <exclude name="projectuiapi/test/unit/src/org/netbeans/modules/project/uiapi/data/*.txt" /> <!--test data-->
                 <exclude name="projectui/src/org/netbeans/modules/project/ui/resources/*-license.txt" /> <!--licenses-->
                 <exclude name="projectui/src/org/netbeans/modules/project/ui/resources/license-default.txt" /> <!--licenses-->
+                <exclude name="css.prep/test/qa-functional/data/css_prep/public_html/cc.less" /> <!--simple file for testing-->
+                <exclude name="css.prep/test/qa-functional/data/css_prep/public_html/cc.scss" /> <!--simple file for testing-->
+                <exclude name="css.prep/test/qa-functional/data/css_prep/public_html/folder/part.scss" /> <!--simple file for testing-->
+                <exclude name="css.prep/test/qa-functional/data/css_prep/public_html/folder/partial.less" /> <!--simple file for testing-->
+                <exclude name="css.prep/test/qa-functional/data/css_prep/public_html/less_syntax.less" /> <!--simple file for testing-->
+                <exclude name="css.prep/test/qa-functional/data/css_prep/public_html/sass_syntax.scss" /> <!--simple file for testing-->
+                <exclude name="css.prep/test/unit/data/testFiles/test.less" /> <!--simple file for testing-->
+                <exclude name="css.prep/test/unit/data/testFiles/testIssue227676.scss" /> <!--simple file for testing-->
+                <exclude name="css.prep/test/unit/data/testProject/public_html/client1.scss" /> <!--simple file for testing-->
+                <exclude name="css.prep/test/unit/data/testProject/public_html/lib1.scss" /> <!--simple file for testing-->
+                <exclude name="css.prep/test/unit/data/testProject/public_html/test.less" /> <!--simple file for testing-->
+                <exclude name="css.prep/test/unit/data/testProject/public_html/test1.scss" /> <!--simple file for testing-->
+                <exclude name="css.prep/test/unit/data/testProject/public_html/test2.scss" /> <!--simple file for testing-->
             </fileset>
         </rat:report>
     </target>
