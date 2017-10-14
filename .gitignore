@@ -10,6 +10,8 @@
 /*/external/*/**
 /nbbuild/netbeans/
 /nbbuild/testuserdir/
+/nbbuild/*.zip
+/nbbuild/user.build.properties
 /nbi/engine/native/*/*/dist/
 /nb-javac/
 
@@ -41,8 +43,6 @@
 /websvc.saas.api/src/org/netbeans/modules/websvc/saas/model/wadl/
 /websvc.saas.api/src/org/netbeans/modules/websvc/saas/model/wadl20061109.xsd
 /websvc.saas.api/src/org/netbeans/modules/websvc/saas/model/wadl200902.xsd
-/xml.catalog/src/org/netbeans/modules/xml/catalog/resources/XMLNamespace.xsd
-/xml.catalog/src/org/netbeans/modules/xml/catalog/resources/XMLSchema-instance.xsd
-/xml.catalog/src/org/netbeans/modules/xml/catalog/resources/XMLSchema.dtd
-/xml.catalog/src/org/netbeans/modules/xml/catalog/resources/XMLSchema.xsd
-/xml.catalog/src/org/netbeans/modules/xml/catalog/resources/datatypes.dtd
+/xml/test/qa-functional/data/DTDActionsTestProject/nbproject/private/
+/xml/test/qa-functional/data/ActionsTestProject/nbproject/private/
+/xml/test/qa-functional/data/CoreTemplatesTestProject/nbproject/private/
