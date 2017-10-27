@@ -1,4 +1,9 @@
+rem Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements; and to You under the Apache License, Version 2.0.
+
 @echo off
+rem "Licensed to the Apache Software Foundation (ASF) under one or more
+rem contributor license agreements; and to You under the Apache License,
+rem Version 2.0. "
 rem ---------------------------------------------------------------------------
 rem Version script for the CATALINA Server
 rem
