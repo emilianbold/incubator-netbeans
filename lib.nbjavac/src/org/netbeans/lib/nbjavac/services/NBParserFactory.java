@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -79,7 +79,9 @@ public class NBParserFactory extends ParserFactory {
     public JavacParser newParser(CharSequence input, int startPos, final EndPosTable endPos) {
         Scanner lexer = scannerFactory.newScanner(input, true);
         lexer.seek(startPos);
-        ((NBJavacParser.EndPosTableImpl)endPos).resetErrorEndPos();
+        if (endPos instanceof NBJavacParser.EndPosTableImpl) {
+            ((NBJavacParser.EndPosTableImpl)endPos).resetErrorEndPos();
+        }
         return new NBJavacParser(this, lexer, true, false, true, false, cancelService) {
             @Override protected AbstractEndPosTable newEndPosTable(boolean keepEndPositions) {
                 return new AbstractEndPosTable(this) {
