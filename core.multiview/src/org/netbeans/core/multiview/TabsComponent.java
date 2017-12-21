@@ -31,6 +31,7 @@ import javax.swing.JToggleButton.ToggleButtonModel;
 import javax.swing.KeyStroke;
 import javax.swing.border.Border;
 import javax.swing.plaf.basic.BasicSplitPaneDivider;
+import org.netbeans.core.multiview.actions.ClearSplitAction;
 import org.netbeans.core.spi.multiview.MultiViewDescription;
 import org.netbeans.core.spi.multiview.MultiViewElement;
 import org.openide.awt.Actions;
@@ -169,7 +170,7 @@ class TabsComponent extends JPanel {
             Toolkit.getDefaultToolkit().removeAWTEventListener(awtEventListener);
         }
     }
-    
+
     MultiViewDescription getTopComponentDescription() {
 	return topBottomDescriptions == null ? model.getActiveDescription() : topBottomDescriptions[0];
     }
@@ -453,7 +454,7 @@ class TabsComponent extends JPanel {
                             int toActivate = 0;
                             if( splitPane.getDividerLocation() < 10 )
                                 toActivate = 1;
-                            SplitAction.clearSplit( tc, toActivate );
+                            ClearSplitAction.clearSplit( tc, toActivate );
                         }
 		    }
                 }
