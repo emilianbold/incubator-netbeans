@@ -16,12 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.core.multiview.actions;
+package org.netbeans.core.multiview;
 
 import java.awt.event.ActionEvent;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
-import org.netbeans.core.multiview.Splitable;
 import org.openide.awt.ActionID;
 import org.openide.awt.ActionReference;
 import org.openide.awt.ActionRegistration;
@@ -34,7 +33,7 @@ import org.openide.windows.WindowManager;
  * @author Christian Lenz (Chrizzly)
  */
 @ActionID(
-        category = "Tools",
+        category = "Window",
         id = "org.netbeans.core.multiview.ClearSplitAction"
 )
 @ActionRegistration(
@@ -47,10 +46,26 @@ import org.openide.windows.WindowManager;
 })
 public final class ClearSplitAction extends AbstractAction {
 
-    public void initTopComponent(TopComponent tc) {
+    /**
+     * For usage in SplitAction.
+     *
+     * @param tc
+     */
+    public ClearSplitAction(TopComponent tc) {
+        this();
+        this.initTopComponent(tc);
+    }
+
+    /**
+     * No-arg constructor required for usage via ActionRegistration.
+     */
+    public ClearSplitAction() {
         putValue(Action.NAME, Bundle.LBL_ClearSplitAction());
         //hack to insert extra actions into JDev's popup menu
         putValue("_nb_action_id_", Bundle.LBL_ValueClearSplit()); //NOI18N
+    }
+
+    private void initTopComponent(TopComponent tc) {
         if (tc instanceof Splitable) {
             setEnabled(((Splitable) tc).getSplitOrientation() != -1);
         } else {
@@ -62,21 +77,23 @@ public final class ClearSplitAction extends AbstractAction {
     public void actionPerformed(ActionEvent evt) {
         final TopComponent tc = WindowManager.getDefault().getRegistry().getActivated();
 
-        if (tc != null && ((Splitable) tc).getSplitOrientation() != -1) {
-            clearSplit(tc, -1);
-        }
+        clearSplit(tc, -1);
     }
 
     public static void clearSplit(TopComponent tc, int elementToActivate) {
         if (tc instanceof Splitable) {
-            TopComponent original = ((Splitable) tc).clearSplit(elementToActivate);
+            final Splitable splitableTc = (Splitable) tc;
 
-            original.open();
-            original.requestActive();
-            original.invalidate();
-            original.revalidate();
-            original.repaint();
-            original.requestFocusInWindow();
+            if (splitableTc.getSplitOrientation() != -1) {
+                TopComponent original = splitableTc.clearSplit(elementToActivate);
+
+                original.open();
+                original.requestActive();
+                original.invalidate();
+                original.revalidate();
+                original.repaint();
+                original.requestFocusInWindow();
+            }
         }
     }
 }

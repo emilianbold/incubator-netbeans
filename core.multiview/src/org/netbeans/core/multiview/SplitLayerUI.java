@@ -34,7 +34,6 @@ import javax.swing.JPanel;
 import javax.swing.JSplitPane;
 import javax.swing.SwingUtilities;
 import javax.swing.plaf.LayerUI;
-import org.netbeans.core.multiview.actions.SplitDocumentAction;
 import org.openide.util.ImageUtilities;
 import org.openide.util.NbBundle;
 import org.openide.windows.TopComponent;
@@ -94,7 +93,7 @@ class SplitLayerUI extends LayerUI<JPanel> {
                         @Override
                         public void run() {
                             TopComponent tc = (TopComponent)SwingUtilities.getAncestorOfClass( TopComponent.class, content );
-                            SplitDocumentAction.splitWindow( tc, orientation, splitLocation );
+                            AbstractSplitDocumentAction.splitWindow(tc, orientation, splitLocation);
                         }
                     });
                 } else if( event.getID() == KeyEvent.KEY_PRESSED || event.getID() == KeyEvent.KEY_RELEASED ) {

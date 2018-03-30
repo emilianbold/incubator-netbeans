@@ -16,44 +16,45 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.core.multiview.actions;
+package org.netbeans.core.multiview;
 
 import java.awt.event.ActionEvent;
-import java.lang.ref.Reference;
-import java.lang.ref.WeakReference;
 import javax.swing.AbstractAction;
 import org.netbeans.core.multiview.Splitable;
 import org.openide.windows.TopComponent;
+import org.openide.windows.WindowManager;
 
 /**
  *
  * @author Christian Lenz (Chrizzly)
  */
-public class SplitDocumentAction extends AbstractAction {
+public abstract class AbstractSplitDocumentAction extends AbstractAction {
 
-    private Reference<TopComponent> tcRef;
     private int orientation;
 
-    protected void setTopComponent(TopComponent tc) {
-        // Replaced by weak ref since strong ref led to leaking of editor panes
-        tcRef = new WeakReference<TopComponent>(tc);
-    }
-
-    protected void setOrientation(int orientation) {
+    protected AbstractSplitDocumentAction(int orientation) {
         this.orientation = orientation;
     }
 
-    @Override
-    public void actionPerformed(ActionEvent evt) {
+
+    protected void initTopComponent(TopComponent tc) {
+        if (tc instanceof Splitable) {
+            int split = ((Splitable) tc).getSplitOrientation();
+            setEnabled(split == -1 || split != orientation);
+        } else {
+            setEnabled(false);
+        }
     }
 
-    public void splitDocument() {
-        TopComponent tc = tcRef.get();
+    @Override
+    public final void actionPerformed(ActionEvent evt) {
+        final TopComponent tc = WindowManager.getDefault().getRegistry().getActivated();
 
         if (tc != null) {
             splitWindow(tc, orientation, -1);
         }
     }
+
 
     public static void splitWindow(TopComponent tc, int orientation, int splitLocation) {
         if (tc instanceof Splitable) {
@@ -67,12 +68,4 @@ public class SplitDocumentAction extends AbstractAction {
         }
     }
 
-    protected void setTcEnabled(TopComponent tc, int orientation) {
-        if (tc instanceof Splitable) {
-            int split = ((Splitable) tc).getSplitOrientation();
-            setEnabled(split == -1 || split != orientation);
-        } else {
-            setEnabled(false);
-        }
-    }
 }

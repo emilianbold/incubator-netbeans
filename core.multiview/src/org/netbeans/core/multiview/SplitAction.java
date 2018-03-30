@@ -25,11 +25,7 @@ import javax.swing.Action;
 import javax.swing.JComponent;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
-import javax.swing.JSplitPane;
 import javax.swing.SwingUtilities;
-import org.netbeans.core.multiview.actions.ClearSplitAction;
-import org.netbeans.core.multiview.actions.SplitDocumentHorizontallyAction;
-import org.netbeans.core.multiview.actions.SplitDocumentVerticallyAction;
 import org.openide.awt.DynamicMenuContent;
 import org.openide.awt.Mnemonics;
 import org.openide.util.NbBundle.Messages;
@@ -112,24 +108,16 @@ public class SplitAction extends AbstractAction implements Presenter.Menu, Prese
 	    if (tc != null) {
 		setEnabled(true);
 		if (tc instanceof Splitable && ((Splitable)tc).canSplit()) {
-                                 SplitDocumentVerticallyAction verticalSplitAction = new SplitDocumentVerticallyAction();
-                                 verticalSplitAction.initTopComponent(tc, JSplitPane.VERTICAL_SPLIT);
 
-		    JMenuItem item = new JMenuItem(verticalSplitAction);
+		    JMenuItem item = new JMenuItem(new SplitDocumentVerticallyAction(tc));
 		    Mnemonics.setLocalizedText(item, item.getText());
 		    add(item);
 
-                                 SplitDocumentHorizontallyAction horizontalSplitAction = new SplitDocumentHorizontallyAction();
-                                 horizontalSplitAction.initTopComponent(tc, JSplitPane.HORIZONTAL_SPLIT);
-
-		    item = new JMenuItem(horizontalSplitAction);
+		    item = new JMenuItem(new SplitDocumentHorizontallyAction(tc));
 		    Mnemonics.setLocalizedText(item, item.getText());
 		    add(item);
 
-                                ClearSplitAction clearSplitAction = new ClearSplitAction();
-                                clearSplitAction.initTopComponent(tc);
-
-		    item = new JMenuItem(clearSplitAction);
+		    item = new JMenuItem(new ClearSplitAction(tc));
 
 		    Mnemonics.setLocalizedText(item, item.getText());
 		    add(item);

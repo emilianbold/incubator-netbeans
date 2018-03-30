@@ -16,9 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.netbeans.core.multiview.actions;
+package org.netbeans.core.multiview;
 
-import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import javax.swing.Action;
 import javax.swing.JSplitPane;
@@ -27,41 +26,45 @@ import org.openide.awt.ActionReference;
 import org.openide.awt.ActionRegistration;
 import org.openide.util.NbBundle;
 import org.openide.windows.TopComponent;
-import org.openide.windows.WindowManager;
 
 /**
  *
  * @author Christian Lenz (Chrizzly)
  */
 @ActionID(
-    category = "Tools",
-    id = "org.netbeans.core.multiview.SplitDocumentHorizontallyAction"
+    category = "Window",
+    id = "org.netbeans.core.multiview.SplitDocumentVerticallyAction"
 )
 @ActionRegistration(
-    displayName = "#LBL_ValueSplitHorizontal"
+    displayName = "#LBL_ValueSplitVertical"
 )
-@ActionReference(path = "Shortcuts", name = "DOS-H")
+@ActionReference(path = "Shortcuts", name = "DOS-V")
 @NbBundle.Messages({
-    "LBL_SplitDocumentActionHorizontal=&Horizontally",
-    "LBL_ValueSplitHorizontal=Split horizontally"
+    "LBL_SplitDocumentActionVertical=&Vertically",
+    "LBL_ValueSplitVertical=Split vertically"
 })
-public final class SplitDocumentHorizontallyAction extends SplitDocumentAction implements ActionListener {
-    public void initTopComponent(TopComponent tc, int orientation) {
-        putValue(Action.NAME, Bundle.LBL_SplitDocumentActionHorizontal());
+public final class SplitDocumentVerticallyAction extends AbstractSplitDocumentAction implements ActionListener {
+
+    /**
+     * For usage in SplitAction.
+     * @param tc
+     */
+    public SplitDocumentVerticallyAction(TopComponent tc) {
+        this();
+        this.initTopComponent(tc);
+    }
+
+
+    /**
+     * No-arg constructor required for usage via ActionRegistration.
+     */
+    public SplitDocumentVerticallyAction() {
+        super(JSplitPane.VERTICAL_SPLIT);
+
+        putValue(Action.NAME, Bundle.LBL_SplitDocumentActionVertical());
         //hack to insert extra actions into JDev's popup menu
-        putValue("_nb_action_id_", Bundle.LBL_ValueSplitHorizontal()); //NOI18N
+        putValue("_nb_action_id_", Bundle.LBL_ValueSplitVertical()); //NOI18N
 
-        super.setTcEnabled(tc, orientation);
     }
 
-    @Override
-    public void actionPerformed(ActionEvent evt) {
-        final TopComponent tc = WindowManager.getDefault().getRegistry().getActivated();
-
-        if (tc != null) {
-            super.setTopComponent(tc);
-            super.setOrientation(JSplitPane.HORIZONTAL_SPLIT);
-            super.splitDocument();
-        }
-    }
 }
