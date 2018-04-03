@@ -18,7 +18,8 @@
  */
 package org.netbeans.core.multiview;
 
-import java.awt.event.ActionListener;
+import java.awt.event.ActionEvent;
+import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.JSplitPane;
 import org.openide.awt.ActionID;
@@ -26,6 +27,7 @@ import org.openide.awt.ActionReference;
 import org.openide.awt.ActionRegistration;
 import org.openide.util.NbBundle;
 import org.openide.windows.TopComponent;
+import org.openide.windows.WindowManager;
 
 /**
  *
@@ -43,28 +45,20 @@ import org.openide.windows.TopComponent;
     "LBL_SplitDocumentActionVertical=&Vertically",
     "LBL_ValueSplitVertical=Split vertically"
 })
-public final class SplitDocumentVerticallyAction extends AbstractSplitDocumentAction implements ActionListener {
+public final class SplitDocumentVerticallyAction extends AbstractAction {
 
-    /**
-     * For usage in SplitAction.
-     * @param tc
-     */
-    public SplitDocumentVerticallyAction(TopComponent tc) {
-        this();
-        this.initTopComponent(tc);
-    }
-
-
-    /**
-     * No-arg constructor required for usage via ActionRegistration.
-     */
     public SplitDocumentVerticallyAction() {
-        super(JSplitPane.VERTICAL_SPLIT);
-
         putValue(Action.NAME, Bundle.LBL_SplitDocumentActionVertical());
         //hack to insert extra actions into JDev's popup menu
         putValue("_nb_action_id_", Bundle.LBL_ValueSplitVertical()); //NOI18N
-
     }
 
+    @Override
+    public final void actionPerformed(ActionEvent evt) {
+        final TopComponent tc = WindowManager.getDefault().getRegistry().getActivated();
+
+        if (tc != null) {
+            SplitAction.splitWindow(tc, JSplitPane.VERTICAL_SPLIT, -1);
+        }
+    }
 }

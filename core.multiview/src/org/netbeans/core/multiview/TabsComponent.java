@@ -169,7 +169,7 @@ class TabsComponent extends JPanel {
             Toolkit.getDefaultToolkit().removeAWTEventListener(awtEventListener);
         }
     }
-
+    
     MultiViewDescription getTopComponentDescription() {
 	return topBottomDescriptions == null ? model.getActiveDescription() : topBottomDescriptions[0];
     }
@@ -453,7 +453,7 @@ class TabsComponent extends JPanel {
                             int toActivate = 0;
                             if( splitPane.getDividerLocation() < 10 )
                                 toActivate = 1;
-                            ClearSplitAction.clearSplit( tc, toActivate );
+                            SplitAction.clearSplit( tc, toActivate );
                         }
 		    }
                 }

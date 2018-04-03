@@ -46,54 +46,17 @@ import org.openide.windows.WindowManager;
 })
 public final class ClearSplitAction extends AbstractAction {
 
-    /**
-     * For usage in SplitAction.
-     *
-     * @param tc
-     */
-    public ClearSplitAction(TopComponent tc) {
-        this();
-        this.initTopComponent(tc);
-    }
-
-    /**
-     * No-arg constructor required for usage via ActionRegistration.
-     */
     public ClearSplitAction() {
         putValue(Action.NAME, Bundle.LBL_ClearSplitAction());
         //hack to insert extra actions into JDev's popup menu
         putValue("_nb_action_id_", Bundle.LBL_ValueClearSplit()); //NOI18N
     }
 
-    private void initTopComponent(TopComponent tc) {
-        if (tc instanceof Splitable) {
-            setEnabled(((Splitable) tc).getSplitOrientation() != -1);
-        } else {
-            setEnabled(false);
-        }
-    }
-
     @Override
     public void actionPerformed(ActionEvent evt) {
         final TopComponent tc = WindowManager.getDefault().getRegistry().getActivated();
 
-        clearSplit(tc, -1);
+        SplitAction.clearSplit(tc, -1);
     }
 
-    public static void clearSplit(TopComponent tc, int elementToActivate) {
-        if (tc instanceof Splitable) {
-            final Splitable splitableTc = (Splitable) tc;
-
-            if (splitableTc.getSplitOrientation() != -1) {
-                TopComponent original = splitableTc.clearSplit(elementToActivate);
-
-                original.open();
-                original.requestActive();
-                original.invalidate();
-                original.revalidate();
-                original.repaint();
-                original.requestFocusInWindow();
-            }
-        }
-    }
 }
