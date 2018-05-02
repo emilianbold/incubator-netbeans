@@ -111,6 +111,14 @@ class MultiDiffPanel extends javax.swing.JPanel {
         treeButton.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
         controlToolbar.add(treeButton);
 
+        hideFileListButton.setIcon(org.openide.util.ImageUtilities.loadImageIcon("/org/netbeans/modules/git/resources/icons/info.png", false));
+        hideFileListButton.setText(org.openide.util.NbBundle.getMessage(MultiDiffPanel.class, "MultiDiffPanel.hideFileListButton.text")); // NOI18N
+        hideFileListButton.setToolTipText(org.openide.util.NbBundle.getMessage(MultiDiffPanel.class, "MultiDiffPanel.hideFileListButton.toolTipText")); // NOI18N
+        hideFileListButton.setFocusable(false);
+        hideFileListButton.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+        hideFileListButton.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        controlToolbar.add(hideFileListButton);
+
         jPanel2.setMaximumSize(new java.awt.Dimension(60, 32767));
 
         javax.swing.GroupLayout jPanel2Layout = new javax.swing.GroupLayout(jPanel2);
@@ -121,7 +129,7 @@ class MultiDiffPanel extends javax.swing.JPanel {
         );
         jPanel2Layout.setVerticalGroup(
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 28, Short.MAX_VALUE)
+            .addGap(0, 29, Short.MAX_VALUE)
         );
 
         controlToolbar.add(jPanel2);
@@ -146,11 +154,11 @@ class MultiDiffPanel extends javax.swing.JPanel {
         jPanel4.setLayout(jPanel4Layout);
         jPanel4Layout.setHorizontalGroup(
             jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 30, Short.MAX_VALUE)
+            .addGap(0, 152, Short.MAX_VALUE)
         );
         jPanel4Layout.setVerticalGroup(
             jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 28, Short.MAX_VALUE)
+            .addGap(0, 29, Short.MAX_VALUE)
         );
 
         controlToolbar.add(jPanel4);
@@ -224,7 +232,7 @@ class MultiDiffPanel extends javax.swing.JPanel {
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addComponent(controlToolbar, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(splitPane, javax.swing.GroupLayout.DEFAULT_SIZE, 332, Short.MAX_VALUE))
+                .addComponent(splitPane, javax.swing.GroupLayout.DEFAULT_SIZE, 331, Short.MAX_VALUE))
         );
     }// </editor-fold>//GEN-END:initComponents
     
@@ -236,6 +244,7 @@ class MultiDiffPanel extends javax.swing.JPanel {
     final javax.swing.JComboBox cmbDiffTreeFirst = new javax.swing.JComboBox();
     final javax.swing.JComboBox cmbDiffTreeSecond = new javax.swing.JComboBox();
     final javax.swing.JToolBar controlToolbar = new javax.swing.JToolBar();
+    final javax.swing.JToggleButton hideFileListButton = new javax.swing.JToggleButton();
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JPanel jPanel1;

@@ -23,6 +23,7 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.EventQueue;
+import java.awt.LayoutManager;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.InputEvent;
@@ -151,11 +152,14 @@ public class MultiDiffPanelController implements ActionListener, PropertyChangeL
     private final MultiDiffPanel panel;
     private AbstractAction nextAction;
     private AbstractAction prevAction;
+    private AbstractAction hideFileListAction;
 
     /**
      * panel that is used for displaying the diff if {@code JSplitPane}
      * is not used
      */
+    private boolean diffViewPanelVisible;
+    private boolean diffViewPanelToggleable;
     private PlaceholderPanel diffViewPanel;
     private JComponent infoPanelLoadingFromRepo;
     static final Logger LOG = Logger.getLogger(MultiDiffPanelController.class.getName());
@@ -248,6 +252,9 @@ public class MultiDiffPanelController implements ActionListener, PropertyChangeL
 
     public MultiDiffPanelController (File file, Revision rev1, Revision rev2, int requestedRightLine) {
         this(null, rev1, rev2, true);
+        diffViewPanelVisible = true;
+        //if we start this way there is no toggle
+        diffViewPanelToggleable = false;
         diffViewPanel = new PlaceholderPanel();
         diffViewPanel.setComponent(getInfoPanelLoading());
         this.requestedRightLine = requestedRightLine;
@@ -277,6 +284,8 @@ public class MultiDiffPanelController implements ActionListener, PropertyChangeL
         this.revisionRight = revisionOriginalRight = revisionRight;
         this.fixedRevisions = fixedRevisions;
         panel = new MultiDiffPanel();
+        diffViewPanelVisible = false;
+        diffViewPanelToggleable = true;
         diffViewPanel = null;
         if (fixedRevisions) {
             panel.treeSelectionPanel.setVisible(false);
@@ -477,11 +486,12 @@ public class MultiDiffPanelController implements ActionListener, PropertyChangeL
     }
 
     private void displayDiffView() {
-        if (diffViewPanel == null) {
+        if (!diffViewPanelVisible) {
             int gg = panel.splitPane.getDividerLocation();
             panel.splitPane.setBottomComponent(diffView);
             panel.splitPane.setDividerLocation(gg);
         } else {
+            assert diffViewPanel != null;
             diffViewPanel.setComponent(diffView);
         }
     }
@@ -505,8 +515,38 @@ public class MultiDiffPanelController implements ActionListener, PropertyChangeL
                 onPrevButton();
             }
         };
+        hideFileListAction = new AbstractAction(null, org.openide.util.ImageUtilities.loadImageIcon("/org/netbeans/modules/git/resources/icons/info.png", false)) { //NOI18N
+            {
+                putValue(Action.SHORT_DESCRIPTION, NbBundle.getMessage(MultiDiffPanel.class, "MultiDiffPanel.hideFileListButton.toolTipText")); //NOI18N
+            }
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (diffViewPanelVisible) {
+                    //nothing to hide, show
+                    panel.splitPane.setBottomComponent(diffView);
+                    replaceVerticalSplitPane(panel.splitPane);
+                    diffViewPanelVisible = false;
+
+                    refreshNodes();
+                } else {
+                    //hide
+                    if (diffViewPanel == null) {
+                        diffViewPanel = new PlaceholderPanel();
+                    }
+                    diffViewPanel.setComponent(diffView);
+
+                    replaceVerticalSplitPane(diffViewPanel);
+                    diffViewPanelVisible = true;
+                }
+            }
+        };
+        if(!diffViewPanelToggleable) {
+            hideFileListAction.setEnabled(false);
+        }
         panel.nextButton.setAction(nextAction);
         panel.prevButton.setAction(prevAction);
+        panel.hideFileListButton.setAction(hideFileListAction);
     }
 
     private int lastDividerLoc;
