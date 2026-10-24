@@ -77,6 +77,58 @@
             <available file="${module.auto.deps.xml}"/>
         </condition>
         <property name="jar-excludes" value="**/*.java,**/*.form,**/package.html,**/doc-files/"/>
+        <!-- Support for source-only modules (compiled on demand by the module
+             system at runtime, see platform/o.n.bootstrap SourceModule):
+             set is.source.module=true in nbproject/project.properties and add
+             OpenIDE-Module-Source: true to manifest.mf.
+
+             By default the module is packaged in HYBRID form: compiled
+             classes (as before, for build-time dependents) plus the full
+             source tree. The runtime ignores the packaged classes and always
+             compiles from source - so patched sources are picked up - but
+             other not-yet-converted modules can still compile against this
+             one at build time.
+
+             Once no binary module depends on this one anymore (leaf of the
+             dependency graph, or all dependents converted), additionally set
+             source.module.pure=true: the build then skips compilation
+             completely and packages sources + resources only.
+
+             Set source.module.compile=true to force build-time compilation
+             for verification even in pure mode (classes are not packaged). -->
+        <property name="is.source.module" value="false"/>
+        <condition property="source.module.pack">
+            <istrue value="${is.source.module}"/>
+        </condition>
+        <condition property="binary.module.pack">
+            <isfalse value="${is.source.module}"/>
+        </condition>
+        <property name="source.module.pure" value="false"/>
+        <property name="source.module.compile" value="false"/>
+        <condition property="source.module.hybrid.pack">
+            <and>
+                <istrue value="${is.source.module}"/>
+                <isfalse value="${source.module.pure}"/>
+            </and>
+        </condition>
+        <condition property="source.module.pure.pack">
+            <and>
+                <istrue value="${is.source.module}"/>
+                <istrue value="${source.module.pure}"/>
+            </and>
+        </condition>
+        <condition property="source.module.needs.compile">
+            <or>
+                <istrue value="${source.module.compile}"/>
+                <istrue value="${source.module.hybrid.pack}"/>
+            </or>
+        </condition>
+        <condition property="source.module.skip.compile">
+            <and>
+                <istrue value="${is.source.module}"/>
+                <isfalse value="${source.module.needs.compile}"/>
+            </and>
+        </condition>
         <property name="module.jar.verifylinkageignores" value=""/>
         <property name="cp.extra" value=""/>
         <tstamp>
@@ -211,7 +263,15 @@
     <extension-point name="-pre-compile" depends="init,up-to-date"/>
     <extension-point name="-post-compile" depends="-pre-compile,-do-compile"/>
     <target name="compile" depends="-pre-compile,-do-compile,-post-compile"/>
-    <target name="-do-compile" depends="init,up-to-date,-pre-compile" unless="is.jar.uptodate">
+    <target name="-check-compile" depends="up-to-date">
+        <condition property="compile.disabled">
+            <or>
+                <isset property="is.jar.uptodate"/>
+                <isset property="source.module.skip.compile"/>
+            </or>
+        </condition>
+    </target>
+    <target name="-do-compile" depends="init,up-to-date,-pre-compile,-check-compile" unless="compile.disabled">
         <mkdir dir="${build.classes.dir}"/>
         <depend srcdir="${src.dir}" destdir="${build.classes.dir}" cache="${build.dir}/depcache">
             <classpath refid="cp"/>
@@ -272,7 +332,38 @@
     <extension-point name="-pre-jar" depends="init,compile,jar-prep"/>
     <extension-point name="-post-jar" depends="-pre-jar,-do-jar"/>
     <target name="jar" depends="-pre-jar,-do-jar,-post-jar"/>
-    <target name="-do-jar" depends="init,compile,jar-prep,-pre-jar" unless="is.jar.uptodate">
+    <target name="-do-jar" depends="init,compile,jar-prep,-pre-jar,-do-jar-source-pure,-do-jar-source-hybrid,-do-jar-binary" unless="is.jar.uptodate"/>
+    <target name="-do-jar-source-pure" depends="init,compile,jar-prep,-pre-jar" if="source.module.pure.pack" unless="is.jar.uptodate">
+        <!-- Pure source-only module: no classes at all, just the src/ tree
+             (sources + resources). Only safe when no binary module depends
+             on this one. The manifest must carry OpenIDE-Module-Source: true;
+             everything else (deps, spec version, ...) is computed as usual.
+             The module system compiles this JAR on demand at runtime. -->
+        <jarwithmoduleattributes jarfile="${cluster}/${module.jar}" compress="${build.package.compress}" index="${build.package.index}" manifest="${manifest.mf}" stamp="${cluster}/.lastModified">
+            <fileset dir="${src.dir}" excludes="**/*.form,**/package.html,**/doc-files/"/>
+        </jarwithmoduleattributes>
+    </target>
+    <target name="-do-jar-source-hybrid" depends="init,compile,jar-prep,-pre-jar" if="source.module.hybrid.pack" unless="is.jar.uptodate">
+        <!-- Hybrid source module: compiled classes as usual (so that binary
+             dependents keep building) plus the complete source tree. At
+             runtime the module system compiles from the sources and ignores
+             the packaged classes. Regenerable artifacts (generated service
+             registrations, merged Bundle.properties, generated layer) are
+             NOT packaged: the runtime compile regenerates them, and their
+             presence would collide with the annotation processors (they
+             would look like handwritten sources). -->
+        <jarwithmoduleattributes jarfile="${cluster}/${module.jar}" compress="${build.package.compress}" index="${build.package.index}" manifest="${manifest.mf}" stamp="${cluster}/.lastModified">
+            <fileset dir="${build.classes.dir}">
+                <exclude name="META-INF/services/**"/>
+                <exclude name="META-INF/namedservices/**"/>
+                <exclude name="META-INF/namedservices.index"/>
+                <exclude name="META-INF/generated-layer.xml"/>
+                <exclude name="**/Bundle.properties"/>
+            </fileset>
+            <fileset dir="${src.dir}" includes="**/*.java,META-INF/services/**,META-INF/namedservices/**,**/Bundle.properties"/>
+        </jarwithmoduleattributes>
+    </target>
+    <target name="-do-jar-binary" depends="init,compile,jar-prep,-pre-jar" if="binary.module.pack" unless="is.jar.uptodate">
         <!-- This task adds some or all of: -Public-Packages, -Friends, Class-Path, -IDE-Dependencies, -Module-Dependencies, -Specification-Version, -Implementation-Version, -Build-Version, AutoUpdate-Show-In-Client -->
         <jarwithmoduleattributes jarfile="${cluster}/${module.jar}" compress="${build.package.compress}" index="${build.package.index}" manifest="${manifest.mf}" stamp="${cluster}/.lastModified">
             <fileset dir="${build.classes.dir}"/>

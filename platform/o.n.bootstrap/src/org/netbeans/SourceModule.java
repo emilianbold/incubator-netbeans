@@ -1,0 +1,252 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.netbeans;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.jar.Manifest;
+import java.util.logging.Level;
+import org.openide.modules.Dependency;
+
+/**
+ * A module shipped as source code only. The JAR layout is that of a regular
+ * module (complete manifest, resources at the root), except that it holds
+ * {@code *.java} files where a binary module holds compiled classes; the
+ * manifest must carry {@code OpenIDE-Module-Source: true}.
+ * <p>
+ * When the module is enabled, its sources are compiled on demand (see
+ * {@link SourceModuleCompiler}) into the user directory cache and the module
+ * classloader is built over the compiled output directory - which
+ * {@link JarClassLoader} supports natively, like for patched modules. The
+ * source JAR itself is deliberately <em>not</em> part of the classpath, so
+ * handwritten resources are never seen twice (they are copied into the
+ * compilation output, as the ant harness would).
+ * <p>
+ * If the module is patched locally (or any of its dependencies changes), the
+ * cached compilation is detected as stale and the module is recompiled at the
+ * next enablement.
+ *
+ * @see SourceModuleCompiler
+ * @since org.netbeans.base/1
+ */
+class SourceModule extends StandardModule {
+
+    /** Manifest header marking a module JAR as source-only. Value: {@code true}. */
+    public static final String SOURCE_HEADER = "OpenIDE-Module-Source"; // NOI18N
+
+    /**
+     * Directory with the compiled classes of this module.
+     * Assigned in {@link #classLoaderUp} before the loader is created;
+     * also read by dependent source modules when they assemble their
+     * own compilation classpath.
+     */
+    private File compiledClasses;
+
+    /** Use ModuleManager.create as a factory. */
+    public SourceModule(ModuleManager mgr, Events ev, File jar, Object history, boolean reloadable, boolean autoload, boolean eager) throws IOException {
+        super(mgr, ev, jar, history, reloadable, autoload, eager);
+    }
+
+    /** Whether the given manifest marks a source-only module. */
+    static boolean isSourceModule(Manifest mf) {
+        return mf != null && Boolean.parseBoolean(mf.getMainAttributes().getValue(SOURCE_HEADER));
+    }
+
+    /** Directory this module was compiled into, or null if not yet compiled. */
+    File getCompiledClasses() {
+        return compiledClasses;
+    }
+
+    /**
+     * Compile the module if needed, then bring up a classloader over the
+     * compiled output - the same construction as
+     * {@link StandardModule#classLoaderUp}, except that the compiled classes
+     * directory replaces the (source) module JAR.
+     */
+    @Override
+    protected void classLoaderUp(Set<Module> parents) throws IOException {
+        if (Util.err.isLoggable(Level.FINE)) {
+            Util.err.log(Level.FINE, "classLoaderUp on source module {0} with parents {1}", new Object[] {this, parents});
+        }
+        // Make sure we are compiled and up to date before anything looks
+        // for classes in this module.
+        compiledClasses = SourceModuleCompiler.compileIfNeeded(this, computeClasspath());
+
+        // Find classloaders for dependent modules and parent to them.
+        List<ClassLoader> loaders = new ArrayList<>(parents.size() + 1);
+        // This should really be the base loader created by org.nb.Main for loading openide etc.:
+        loaders.add(Module.class.getClassLoader());
+        for (Module parent: parents) {
+            PackageExport[] exports = parent.getPublicPackages();
+            if (exports != null && exports.length == 0) {
+                // Check if there is an impl dep here.
+                boolean implDep = false;
+                for (Dependency dep : getDependenciesArray()) {
+                    if (dep.getType() == Dependency.TYPE_MODULE &&
+                            dep.getComparison() == Dependency.COMPARE_IMPL &&
+                            dep.getName().equals(parent.getCodeName())) {
+                        implDep = true;
+                        break;
+                    }
+                }
+                if (!implDep) {
+                    // Nothing exported from here at all, no sense even adding it.
+                    // Shortcut; would not harm anything to add it now, but we would
+                    // never use it anyway.
+                    // Cf. #27853.
+                    continue;
+                }
+            }
+            ClassLoader l = getParentLoader(parent);
+            if (parent.isFixed() && loaders.contains(l)) {
+                Util.err.log(Level.FINE, "#24996: skipping duplicate classloader from {0}", parent);
+                continue;
+            }
+            loaders.add(l);
+        }
+
+        // Patches first, then the freshly compiled classes, then any
+        // Class-Path extension JARs (resolved relative to the source JAR,
+        // which sits in the cluster's modules/ dir next to modules/ext/).
+        List<File> classp = new ArrayList<>(3);
+        Set<File> ptchs = findPatches();
+        if (ptchs != null) classp.addAll(ptchs);
+        classp.add(compiledClasses);
+
+        ((StandardModuleData)data()).addCp(classp);
+
+        // possibly inject some patches
+        getManager().refineModulePath(this, classp);
+
+        // #27853
+        ClassLoader cld = getManager().refineClassLoader(this, loaders);
+        // the classloader may be shared, if this module is a fragment
+        if (cld != null) {
+            classloader = cld;
+        } else {
+            try {
+                classloader = createNewClassLoader(classp, loaders);
+            } catch (IllegalArgumentException iae) {
+                // Should not happen, but just in case.
+                throw new IOException(iae);
+            }
+        }
+    }
+
+    /**
+     * Computes the compilation classpath for this module: the JARs (or
+     * compiled outputs) of all declared module dependencies, transitively,
+     * including their patches and {@code Class-Path} extensions, plus this
+     * module's own extensions; and the JARs of the fixed (boot) modules.
+     * The latter have no JAR list of their own - they are loaded from the
+     * startup classpath - so we enumerate the manifests visible to their
+     * classloaders; in a regular startup this is MainImpl's BootClassLoader
+     * covering both platform lib/ and core/.
+     */
+    private List<File> computeClasspath() throws IOException {
+        LinkedHashSet<File> cp = new LinkedHashSet<>();
+        // Own patches and Class-Path extensions (but not the source JAR itself).
+        for (File f : getAllJars()) {
+            if (!f.equals(getJarFile())) {
+                cp.add(f);
+            }
+        }
+        collectDependencyJars(this, cp, new HashSet<String>());
+        Set<ClassLoader> bootLoaders = new HashSet<>();
+        bootLoaders.add(Module.class.getClassLoader());
+        for (Module m : getManager().getModules()) {
+            if (m.isFixed()) {
+                try {
+                    bootLoaders.add(m.getClassLoader());
+                } catch (IllegalArgumentException ex) {
+                    // Not enabled yet - e.g. an eager fixed module; skip.
+                }
+            }
+        }
+        for (ClassLoader boot : bootLoaders) {
+            Enumeration<URL> manifests = boot.getResources("META-INF/MANIFEST.MF"); // NOI18N
+            while (manifests.hasMoreElements()) {
+                File jar = SourceModuleCompiler.jarUrlToFile(manifests.nextElement());
+                if (jar != null && jar.isFile()) {
+                    cp.add(jar);
+                }
+            }
+        }
+        return new ArrayList<>(cp);
+    }
+
+    /** Adds JARs (or compiled dirs) of all transitive module dependencies. */
+    private void collectDependencyJars(Module m, Set<File> cp, Set<String> visited) {
+        for (Dependency dep : m.getDependenciesArray()) {
+            if (dep.getType() != Dependency.TYPE_MODULE) {
+                // Token provides do not contribute classes.
+                continue;
+            }
+            String name = (String) Util.parseCodeName(dep.getName())[0];
+            if (!visited.add(name)) {
+                continue;
+            }
+            Module parent = getManager().get(name);
+            if (parent == null) {
+                // Unsatisfied dependency - reported elsewhere with a proper error.
+                continue;
+            }
+            if (parent instanceof SourceModule) {
+                // A source module: compile against its compiled output
+                // (already brought up, since dependencies are enabled first),
+                // plus its patches and Class-Path extensions.
+                File classes = ((SourceModule) parent).getCompiledClasses();
+                if (classes != null) {
+                    cp.add(classes);
+                }
+                for (File f : parent.getAllJars()) {
+                    if (!f.equals(parent.getJarFile())) {
+                        cp.add(f);
+                    }
+                }
+            } else {
+                cp.addAll(parent.getAllJars());
+            }
+            collectDependencyJars(parent, cp, visited);
+        }
+    }
+
+    @Override
+    public void reload() throws IOException {
+        // The recompile-on-enable machinery will pick up any changes:
+        // the stamp check in SourceModuleCompiler compares against the
+        // source JAR contents afresh on every classLoaderUp.
+        super.reload();
+    }
+
+    public @Override String toString() {
+        String s = "SourceModule:" + getCodeNameBase() + " jarFile: " + getJarFile(); // NOI18N
+        if (!isValid()) s += "[invalid]"; // NOI18N
+        return s;
+    }
+
+}

@@ -272,7 +272,7 @@ class StandardModule extends Module {
     }
 
     @SuppressWarnings("ReturnOfCollectionOrArrayField") // collection is only accessed in StandardModule
-    private Set<File> findPatches() {
+    protected Set<File> findPatches() {
         if (patches == null) {
             // #9273: load any modules/patches/this-code-name/*.jar files first:
             File patchdir = new File(new File(jar.getParentFile(), "patches"), // NOI18N

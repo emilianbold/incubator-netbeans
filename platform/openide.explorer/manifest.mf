@@ -3,4 +3,5 @@ OpenIDE-Module: org.openide.explorer
 OpenIDE-Module-Localizing-Bundle: org/openide/explorer/Bundle.properties
 AutoUpdate-Essential-Module: true
 OpenIDE-Module-Specification-Version: 6.97
+OpenIDE-Module-Source: true
 
