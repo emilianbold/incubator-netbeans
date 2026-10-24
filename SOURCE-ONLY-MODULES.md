@@ -204,8 +204,8 @@ Suggested stages:
    from source during startup (regenerating layers and service
    registrations via the runtime annotation processors), and a warm start
    on the same userdir reuses the cache with no recompilation at all.
-2. (done, mass conversion) 137 of the 262 modules of the Platform+Java
-   clusters are now source-only (64 Platform, 73 Java) - every module with
+2. (done, mass conversion) 133 of the 262 modules of the Platform+Java
+   clusters are now source-only (64 Platform, 69 Java) - every module with
    a plain ant build (bare `build.xml`, no annotation-processor
    providers, no javahelp) that does not compile against the javac APIs.
    Three with benign custom targets are included (`o.n.swing.tabcontrol`
