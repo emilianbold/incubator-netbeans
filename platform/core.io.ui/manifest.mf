@@ -4,4 +4,5 @@ OpenIDE-Module-Provides: org.openide.windows.IOContainer$Provider
 OpenIDE-Module-Layer: org/netbeans/core/io/ui/layer.xml
 OpenIDE-Module-Localizing-Bundle: org/netbeans/core/io/ui/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.65
+OpenIDE-Module-Source: true
 

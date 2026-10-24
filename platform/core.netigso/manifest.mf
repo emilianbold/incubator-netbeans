@@ -5,4 +5,5 @@ OpenIDE-Module-Provides: org.netbeans.NetigsoFramework
 OpenIDE-Module-Specification-Version: 1.66
 OpenIDE-Module-Needs: org.osgi.framework.launch.FrameworkFactory
 AutoUpdate-Essential-Module: true
+OpenIDE-Module-Source: true
 

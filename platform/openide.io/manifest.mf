@@ -4,4 +4,5 @@ OpenIDE-Module-Specification-Version: 1.84
 OpenIDE-Module-Localizing-Bundle: org/openide/io/Bundle.properties
 OpenIDE-Module-Recommends: org.openide.windows.IOProvider, org.openide.windows.IOContainer$Provider
 AutoUpdate-Essential-Module: true
+OpenIDE-Module-Source: true
 

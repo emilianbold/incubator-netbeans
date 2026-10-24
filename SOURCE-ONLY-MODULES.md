@@ -151,6 +151,12 @@ Modules that need extra care or should stay binary:
   or **code generation** (`web.jspparser`'s servlet-API rewriting, JavaCC/
   ANTLR grammars, ant-task compilation into `modules/ext`) - keep them
   binary, or teach the harness to run those steps at runtime.
+* **Modules compiling against javac internals** (`lib.nbjavac`) and modules
+  whose build resolves platform jars outside the module dependency model
+  (`htmlui` and the JavaFX platform) - both found by the live smoke test,
+  both kept binary. A per-module compiler-arguments manifest header (fed
+  from `javac.compilerargs` by the harness) would cover the add-exports
+  cases if ever needed.
 * **OSGi bundles** consumed through the netigso bridge are foreign artifacts
   anyway.
 
@@ -172,12 +178,23 @@ Suggested stages:
    from source during startup (regenerating layers and service
    registrations via the runtime annotation processors), and a warm start
    on the same userdir reuses the cache with no recompilation at all.
-2. Leaves and low-fan-in modules across all clusters (analysis script over
-   `*/nbproject/project.xml`), hybrid first, pure when their remaining
-   dependents are converted.
-3. Whole subsystems once their internal dependency subtree is fully
+2. (done, mass conversion) 182 of the 262 modules of the Platform+Java
+   clusters are now source-only (64 Platform, 118 Java) - every module
+   with a plain ant build (bare `build.xml`, no annotation-processor
+   providers, no javahelp), plus three with benign custom targets
+   (`o.n.swing.tabcontrol` demo targets, `print`, `autoupdate.services`).
+   Library wrappers and processor providers stay binary, as do two
+   instructive failures found by the live smoke test: `lib.nbjavac`
+   (patches javac internals) and `htmlui` (compiles against the JavaFX
+   platform, whose jars are resolved by build-time plumbing the runtime
+   classpath model does not cover). A live platform start compiles 47
+   modules from source with zero failures; the warm start recompiles
+   nothing.
+3. Processor providers, once their users are converted (today every one
+   of them still has users in the not-yet-converted ide/extide clusters).
+4. Whole subsystems once their internal dependency subtree is fully
    converted.
-4. The small binary core that remains: bootstrap, the `openide.*` SPI
+5. The small binary core that remains: bootstrap, the `openide.*` SPI
    modules, processor-provider modules, native-code and javahelp modules -
    plus anything with unusual build steps.
 

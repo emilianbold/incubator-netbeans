@@ -6,4 +6,5 @@ AutoUpdate-Show-In-Client: false
 AutoUpdate-Essential-Module: true
 OpenIDE-Module-Recommends: org.netbeans.core.ProxySettings.Reloader 
 OpenIDE-Module-Specification-Version: 3.86
+OpenIDE-Module-Source: true
 

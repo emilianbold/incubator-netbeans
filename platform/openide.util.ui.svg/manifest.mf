@@ -4,4 +4,5 @@ OpenIDE-Module: org.openide.util.ui.svg
 OpenIDE-Module-Localizing-Bundle: org/openide/util/svg/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.29
 OpenIDE-Module-Provides: org.openide.util.spi.SVGLoader
+OpenIDE-Module-Source: true
 

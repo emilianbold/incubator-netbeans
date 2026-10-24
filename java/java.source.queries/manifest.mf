@@ -4,3 +4,4 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/java/source/queries/Bundl
 OpenIDE-Module-Specification-Version: 1.53
 OpenIDE-Module-Needs: org.netbeans.modules.java.source.queries.spi.QueriesController
 Netigso-Export-Package: org.netbeans.modules.java.source.queries.api,org.netbeans.modules.java.source.queries.spi
+OpenIDE-Module-Source: true

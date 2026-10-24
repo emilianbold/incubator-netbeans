@@ -4,3 +4,4 @@ OpenIDE-Module-Specification-Version: 1.78
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/java/freeform/Bundle.properties
 OpenIDE-Module-Layer: org/netbeans/modules/java/freeform/resources/layer.xml
 AutoUpdate-Show-In-Client: false
+OpenIDE-Module-Source: true

@@ -4,4 +4,5 @@ OpenIDE-Module-Layer: org/netbeans/modules/j2ee/jpa/verification/resources/layer
 OpenIDE-Module-Specification-Version: 1.70
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/j2ee/jpa/verification/Bundle.properties
 AutoUpdate-Show-In-Client: false
+OpenIDE-Module-Source: true
 

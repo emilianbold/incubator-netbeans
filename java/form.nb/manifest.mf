@@ -4,3 +4,4 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/nbform/Bundle.properties
 OpenIDE-Module-Implementation-Version: 1
 OpenIDE-Module-Layer: org/netbeans/modules/nbform/resources/layer.xml
 AutoUpdate-Show-In-Client: false
+OpenIDE-Module-Source: true

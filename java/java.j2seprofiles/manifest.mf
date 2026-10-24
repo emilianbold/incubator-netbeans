@@ -3,4 +3,5 @@ AutoUpdate-Show-In-Client: false
 OpenIDE-Module: org.netbeans.modules.java.j2seprofiles
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/java/j2seprofiles/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.43
+OpenIDE-Module-Source: true
 

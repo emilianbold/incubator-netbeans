@@ -6,4 +6,5 @@ OpenIDE-Module-Needs: javax.script.ScriptEngine.freemarker
 OpenIDE-Module-Specification-Version: 1.110
 OpenIDE-Module-Recommends: org.netbeans.spi.java.project.runner.JavaRunnerImplementation
 AutoUpdate-Show-In-Client: false
+OpenIDE-Module-Source: true
 

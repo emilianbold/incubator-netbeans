@@ -5,3 +5,4 @@ OpenIDE-Module-Install: org/netbeans/libs/flatlaf/Installer.class
 OpenIDE-Module-Specification-Version: 1.29
 AutoUpdate-Show-In-Client: false
 OpenIDE-Module-Implementation-Version: 3.7.2
+OpenIDE-Module-Source: true

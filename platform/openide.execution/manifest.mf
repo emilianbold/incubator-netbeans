@@ -4,3 +4,4 @@ OpenIDE-Module-Specification-Version: 9.38
 OpenIDE-Module-Localizing-Bundle: org/openide/execution/Bundle.properties
 OpenIDE-Module-Recommends: org.openide.execution.ExecutionEngine
 AutoUpdate-Essential-Module: true
+OpenIDE-Module-Source: true

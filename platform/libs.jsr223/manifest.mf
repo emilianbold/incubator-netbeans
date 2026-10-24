@@ -3,4 +3,5 @@ OpenIDE-Module: org.netbeans.libs.jsr223/1
 OpenIDE-Module-Specification-Version: 1.70
 OpenIDE-Module-Localizing-Bundle: org/netbeans/libs/jsr223/Bundle.properties
 OpenIDE-Module-Deprecated: true
+OpenIDE-Module-Source: true
 

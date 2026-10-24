@@ -73,7 +73,8 @@ final class JavaSourceRuntime extends SourceRuntime {
         List<File> sourceFiles = new ArrayList<>();
         findJavaFiles(srcDir, sourceFiles);
         if (sourceFiles.isEmpty()) {
-            throw new IOException("No Java sources found in " + srcDir); // NOI18N
+            // Resource-only module (e.g. a kit): nothing to compile.
+            return;
         }
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();

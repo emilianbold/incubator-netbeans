@@ -4,4 +4,5 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/masterfs/watcher/linux/Bu
 OpenIDE-Module-Specification-Version: 1.48
 OpenIDE-Module-Requires: org.openide.modules.os.Linux
 OpenIDE-Module-Provides: org.netbeans.modules.masterfs.providers.Notifier
+OpenIDE-Module-Source: true
 

@@ -4,4 +4,5 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/masterfs/watcher/windows/
 OpenIDE-Module-Requires: org.openide.modules.os.Windows
 OpenIDE-Module-Provides: org.netbeans.modules.masterfs.providers.Notifier
 OpenIDE-Module-Specification-Version: 1.51
+OpenIDE-Module-Source: true
 

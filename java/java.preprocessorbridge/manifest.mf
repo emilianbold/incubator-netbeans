@@ -3,3 +3,4 @@ OpenIDE-Module: org.netbeans.modules.java.preprocessorbridge
 OpenIDE-Module-Implementation-Version: 1
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/java/preprocessorbridge/Bundle.properties
 OpenIDE-Module-Needs: org.netbeans.modules.java.preprocessorbridge.spi.JavaSourceUtilImpl
+OpenIDE-Module-Source: true

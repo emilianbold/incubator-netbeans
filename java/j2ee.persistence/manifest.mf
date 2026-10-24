@@ -5,3 +5,4 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/j2ee/persistence/ui/resou
 OpenIDE-Module-Needs: javax.script.ScriptEngine.freemarker
 OpenIDE-Module-Implementation-Version: 1
 AutoUpdate-Show-In-Client: false
+OpenIDE-Module-Source: true

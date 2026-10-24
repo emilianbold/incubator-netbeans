@@ -5,4 +5,5 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/swing/laf/flatlaf/Bundle.properti
 OpenIDE-Module: org.netbeans.swing.laf.flatlaf
 OpenIDE-Module-Specification-Version: 1.28
 AutoUpdate-Show-In-Client: false
+OpenIDE-Module-Source: true
 

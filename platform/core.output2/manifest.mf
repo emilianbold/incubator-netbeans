@@ -5,4 +5,5 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/core/output2/Bundle.properties
 OpenIDE-Module-Provides: org.openide.windows.IOProvider, org.netbeans.spi.io.InputOutputProvider
 AutoUpdate-Essential-Module: true
 OpenIDE-Module-Specification-Version: 1.77
+OpenIDE-Module-Source: true
 

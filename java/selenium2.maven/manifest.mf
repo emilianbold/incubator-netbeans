@@ -4,4 +4,5 @@ OpenIDE-Module: org.netbeans.modules.selenium2.maven
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/selenium2/maven/Bundle.properties
 OpenIDE-Module-Provides: org.netbeans.modules.selenium2.maven.Selenium2MavenSupportImpl
 OpenIDE-Module-Specification-Version: 1.37
+OpenIDE-Module-Source: true
 

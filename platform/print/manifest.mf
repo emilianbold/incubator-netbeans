@@ -4,3 +4,4 @@ OpenIDE-Module-Specification-Version: 7.61
 OpenIDE-Module: org.netbeans.modules.print
 OpenIDE-Module-Layer: org/netbeans/modules/print/resources/layer.xml
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/print/resources/Bundle.properties
+OpenIDE-Module-Source: true

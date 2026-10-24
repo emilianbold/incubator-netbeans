@@ -3,4 +3,5 @@ OpenIDE-Module: org.netbeans.api.java/1
 OpenIDE-Module-Specification-Version: 1.102
 OpenIDE-Module-Localizing-Bundle: org/netbeans/api/java/queries/Bundle.properties
 AutoUpdate-Show-In-Client: false
+OpenIDE-Module-Source: true
 

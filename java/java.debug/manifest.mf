@@ -4,4 +4,5 @@ OpenIDE-Module-Implementation-Version: 1
 OpenIDE-Module-Layer: org/netbeans/modules/java/debug/resources/layer.xml
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/java/debug/resources/Bundle.properties
 AutoUpdate-Show-In-Client: false
+OpenIDE-Module-Source: true
 

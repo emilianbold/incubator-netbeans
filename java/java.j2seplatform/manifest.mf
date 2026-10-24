@@ -6,3 +6,4 @@ OpenIDE-Module-Install: org/netbeans/modules/java/j2seplatform/J2SEPlatformModul
 AutoUpdate-Show-In-Client: false
 OpenIDE-Module-Specification-Version: 1.78
 OpenIDE-Module-Provides: j2seplatform
+OpenIDE-Module-Source: true

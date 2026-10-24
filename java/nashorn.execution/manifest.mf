@@ -5,4 +5,5 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/nashorn/execution/Bundle.
 OpenIDE-Module-Specification-Version: 1.41
 AutoUpdate-Show-In-Client: false
 OpenIDE-Module-Recommends: org.netbeans.libs.graaljs
+OpenIDE-Module-Source: true
 
