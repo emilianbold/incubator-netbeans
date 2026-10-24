@@ -285,9 +285,40 @@ time* - a bytecode runtime cannot compile against classes that only
 exist in memory. Dependents of interpreted modules should themselves be
 interpreted, or the runtime should materialize output.
 
-Remaining follow-up: a real non-JVM runtime. With interpreter mode in
-place the field is wide open: Clojure (AOT bytecode, cached) or a
-scripting language served straight from source both fit the contract.
+## Notes for later
+
+* **Demo runtime: Groovy.** Groovy is the ideal first real language runtime
+  because it can demonstrate the *entire* SPI with one language:
+  interpreter mode via `GroovyClassLoader` (serve `.groovy` sources
+  straight from the module JAR, classes defined in memory, nothing
+  materialized) and bytecode mode via `FileSystemCompiler` (AOT into the
+  cache directory with staleness-based recompilation) - the same module
+  flipped between modes shows that source code is the deployment artifact
+  and bytecode is merely an optional cache. Clojure as the dramatic second
+  (interpreter mode first, bytecode mode to fix its slow startup).
+
+* **Build systems and the SPI.** The built-in Java runtime bakes in the
+  ant-harness conventions (sources at the JAR root, resource copying,
+  processorpath = declared dependency JARs, no `-A` options) - which is
+  correct, since that is what a "plain" NetBeans module *is*. A module
+  that needs a dynamic build (e.g. Gradle with a build script) does not
+  fit that runtime, but it does not break the design: a build system is
+  just another `SourceRuntime` (the module JAR would ship its sources plus
+  its build script, and a `gradle` runtime would run the build in
+  `build()`). Known gaps to solve before that is real:
+  1. the staleness stamp is computed by the driver from source-JAR
+     contents, classpath files and the runtime version - a dynamic build
+     has more inputs (build scripts, resolved dependency versions,
+     toolchain versions), so the SPI will need a per-runtime
+     staleness-input hook;
+  2. the classpath handed to `build()` mirrors the *manifest-declared*
+     dependency closure - a build system that resolves its own classpath
+     dynamically bypasses the module system's closed-world package
+     visibility, so what it compiles against may not exist at runtime;
+  3. executing a build script at module enablement is arbitrary code
+     execution at startup - the trust model (signed modules? dev-mode
+     only?) and autoupdate reproducibility need thought.
+
 
 ## Pointers
 
