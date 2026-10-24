@@ -77,15 +77,53 @@ public class SourceModuleTest extends SetupHid {
 
     /** Creates both modules, enables them, and returns the source module. */
     private Module enableSourceModule(ModuleManager mgr) throws Exception {
+        return createAndEnable(mgr)[1];
+    }
+
+    /** Creates both modules, enables them, and returns [dependency, source]. */
+    private Module[] createAndEnable(ModuleManager mgr) throws Exception {
+        Module dep = mgr.create(depJar, null, false, false, false);
+        Module src = mgr.create(srcJar, null, false, false, false);
         mgr.mutexPrivileged().enterWriteAccess();
         try {
-            Module dep = mgr.create(depJar, null, false, false, false);
-            Module src = mgr.create(srcJar, null, false, false, false);
             mgr.enable(new HashSet<Module>(Arrays.asList(dep, src)));
-            return src;
         } finally {
             mgr.mutexPrivileged().exitWriteAccess();
         }
+        return new Module[] {dep, src};
+    }
+
+    public void testLazyCompilationDefersUntilFirstUse() throws Exception {
+        ModuleManager mgr = newManager();
+        Module srcMod = enableSourceModule(mgr);
+        assertTrue(srcMod.isEnabled());
+        File marker = cacheMarker();
+        assertFalse("enablement must not compile anything yet", marker.exists());
+
+        // Handwritten resources are served straight from the source JAR,
+        // without compiling:
+        assertEquals("some resource\n", readResource(srcMod.getClassLoader(), "org/foo/srcmod/resource.txt")); // NOI18N
+        assertFalse("resource serving must not compile", marker.exists());
+
+        // The first class load triggers the compilation:
+        Class<?> c = srcMod.getClassLoader().loadClass("org.foo.srcmod.Src"); // NOI18N
+        assertEquals("v1", c.getField("ID").get(null));
+        assertTrue(marker.isFile());
+    }
+
+    public void testLayerHintAnswersWithoutCompiling() throws Exception {
+        ModuleManager mgr = newManager();
+        Module srcMod = enableSourceModule(mgr);
+        // The eager startup layer lookup is answered from the build hint,
+        // without compiling a module that has no generated layer:
+        assertFalse("no layer expected", // NOI18N
+                srcMod.findResources("META-INF/generated-layer.xml").hasMoreElements()); // NOI18N
+        assertFalse("layer lookup must not compile a layer-less module", cacheMarker().exists());
+
+        // Generated resources do trigger the compile:
+        String services = readResource(srcMod.getClassLoader(), "META-INF/services/java.lang.Runnable"); // NOI18N
+        assertTrue(services.contains("org.foo.srcmod.Src")); // NOI18N
+        assertTrue(cacheMarker().isFile());
     }
 
     public void testSourceModuleIsCompiledAndLoaded() throws Exception {
@@ -125,9 +163,10 @@ public class SourceModuleTest extends SetupHid {
     }
 
     public void testUnchangedModuleIsNotRecompiled() throws Exception {
-        // First run compiles:
+        // First run compiles (compilation is lazy - loading a class triggers it):
         ModuleManager mgr = newManager();
-        enableSourceModule(mgr);
+        Module m1 = enableSourceModule(mgr);
+        assertEquals("v1", m1.getClassLoader().loadClass("org.foo.srcmod.Src").getField("ID").get(null)); // NOI18N
         File marker = cacheMarker();
         assertTrue(marker.isFile());
         long mtime = marker.lastModified();
@@ -135,8 +174,8 @@ public class SourceModuleTest extends SetupHid {
         // A fresh manager with the very same JAR reuses the cache:
         ModuleManager mgr2 = newManager();
         Module srcMod = enableSourceModule(mgr2);
-        assertEquals("no recompilation expected", mtime, marker.lastModified());
         assertEquals("v1", srcMod.getClassLoader().loadClass("org.foo.srcmod.Src").getField("ID").get(null)); // NOI18N
+        assertEquals("no recompilation expected", mtime, marker.lastModified());
     }
 
     public void testLocallyPatchedModuleIsRecompiled() throws Exception {
@@ -153,7 +192,8 @@ public class SourceModuleTest extends SetupHid {
 
     public void testChangedDependencyInvalidatesCache() throws Exception {
         ModuleManager mgr = newManager();
-        enableSourceModule(mgr);
+        Module m1 = enableSourceModule(mgr);
+        m1.getClassLoader().loadClass("org.foo.srcmod.Src"); // NOI18N
         File marker = cacheMarker();
         long mtime = marker.lastModified();
         assertTrue("nothing compiled?", mtime > 0);
@@ -163,33 +203,53 @@ public class SourceModuleTest extends SetupHid {
         makeDepModule(depJar);
 
         ModuleManager mgr2 = newManager();
-        enableSourceModule(mgr2);
+        Module m2 = enableSourceModule(mgr2);
+        m2.getClassLoader().loadClass("org.foo.srcmod.Src"); // NOI18N
         assertTrue("expected recompilation after dependency change",
                 marker.lastModified() != mtime);
     }
 
-    public void testCompileFailureReportsProblem() throws Exception {
+    public void testCompileFailureIsDeferredToFirstUse() throws Exception {
         makeSourceModule(srcJar, "v1", true);
         ModuleManager mgr = newManager();
-        mgr.mutexPrivileged().enterWriteAccess();
+        Module[] mods = createAndEnable(mgr);
+        // Compilation is lazy: enablement succeeds, the failure surfaces
+        // when the classes are first needed.
+        assertTrue(mods[1].isEnabled());
         try {
-            Module dep = mgr.create(depJar, null, false, false, false);
-            Module src = mgr.create(srcJar, null, false, false, false);
+            mods[1].getClassLoader().loadClass("org.foo.srcmod.Src"); // NOI18N
+            fail("loading a class of a broken source module should fail");
+        } catch (ClassNotFoundException ex) {
+            // OK - the lazy compile failed and reported ClassNotFound.
+        }
+    }
+
+    public void testEagerModeFailsAtEnablement() throws Exception {
+        System.setProperty("netbeans.source.modules.eager", "true"); // NOI18N
+        try {
+            makeSourceModule(srcJar, "v1", true);
+            ModuleManager mgr = newManager();
+            mgr.mutexPrivileged().enterWriteAccess();
             try {
-                mgr.enable(new HashSet<Module>(Arrays.asList(dep, src)));
-                fail("enablement of a broken source module should fail");
-            } catch (InvalidException ex) {
-                // OK - compilation diagnostics should be part of the message:
-                String msg = findMessage(ex);
-                assertTrue("diagnostics not reported: " + msg,
-                        msg.contains("Compilation of source module")); // NOI18N
-                assertTrue("no compile error detail in: " + msg,
-                        msg.contains("illegal start") || msg.contains("expected")); // NOI18N
+                Module dep = mgr.create(depJar, null, false, false, false);
+                Module src = mgr.create(srcJar, null, false, false, false);
+                try {
+                    mgr.enable(new HashSet<Module>(Arrays.asList(dep, src)));
+                    fail("enablement of a broken source module should fail in eager mode");
+                } catch (InvalidException ex) {
+                    String msg = findMessage(ex);
+                    assertTrue("diagnostics not reported: " + msg,
+                            msg.contains("Compilation of source module")); // NOI18N
+                    assertTrue("no compile error detail in: " + msg,
+                            msg.contains("illegal start") || msg.contains("expected")); // NOI18N
+                }
+                assertFalse(src.isEnabled());
+                assertFalse("module should have problems", src.getProblems().isEmpty()); // NOI18N
+            } finally {
+                mgr.mutexPrivileged().exitWriteAccess();
             }
-            assertFalse(src.isEnabled());
-            assertFalse("module should have problems", src.getProblems().isEmpty()); // NOI18N
         } finally {
-            mgr.mutexPrivileged().exitWriteAccess();
+            System.clearProperty("netbeans.source.modules.eager"); // NOI18N
         }
     }
 
@@ -314,6 +374,8 @@ public class SourceModuleTest extends SetupHid {
         manifest.put("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
         manifest.put("OpenIDE-Module-Module-Dependencies", "org.foo.depapi > 1.0"); // NOI18N
         manifest.put("OpenIDE-Module-Source", "true"); // NOI18N
+        // Build-time hint: this module's annotations generate no layer.
+        contents.put("META-INF/generated-layer.hint", "layer=false"); // NOI18N
         createJar(jar, contents, manifest);
     }
 

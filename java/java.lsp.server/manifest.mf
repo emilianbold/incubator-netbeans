@@ -4,5 +4,4 @@ OpenIDE-Module: org.netbeans.modules.java.lsp.server/2
 OpenIDE-Module-Implementation-Version: 1
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/java/lsp/server/Bundle.properties
 OpenIDE-Module-Layer: org/netbeans/modules/java/lsp/server/layer.xml
-OpenIDE-Module-Source: true
 

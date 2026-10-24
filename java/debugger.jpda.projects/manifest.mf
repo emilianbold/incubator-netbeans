@@ -4,4 +4,3 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/debugger/jpda/projects/Bu
 OpenIDE-Module-Provides: org.netbeans.spi.debugger.jpda.SourcePathProvider
 OpenIDE-Module-Package-Dependencies: com.sun.jdi[VirtualMachineManager]
 OpenIDE-Module-Specification-Version: 1.75
-OpenIDE-Module-Source: true

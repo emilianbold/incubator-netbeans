@@ -84,10 +84,28 @@ Two variants exist:
   JDK changed - invalidates the cache and triggers recompilation.
   Recompilation is all-or-nothing: the stamp is written only after a
   successful compile, and a failed compile leaves no partial output behind.
-* **Failure reporting.** A broken source module behaves like any other
-  broken module: enablement fails with an `InvalidException` carrying the
-  compiler diagnostics, and the module shows up in the module system with
-  problems.
+* **Compilation is lazy.** Module *enablement* only creates the loader; the
+  build happens on first use - the first class load, or the first lookup of
+  a resource the compile would generate. Resources that physically exist in
+  the source JAR (handwritten layers, icons, plain bundles) are served
+  straight from the JAR without compiling, since the compile copies them
+  verbatim anyway. The one eagerly-queried generated resource - the layer,
+  looked up for every enabled module during startup - is covered by a
+  build-time hint (`META-INF/generated-layer.hint`, `layer=true/false`),
+  so modules without generated layers answer that lookup without compiling
+  at all. When a dependent source module is compiled, it forces its
+  dependencies' compiles on demand, so laziness propagates down the
+  dependency graph and only modules that are actually *used* pay for
+  compilation. Set `-Dnetbeans.source.modules.eager=true` for fail-fast
+  compilation at enablement instead. (Non-Java bytecode runtimes compile
+  eagerly - their generated output is not classifiable by the lazy loader;
+  interpreter-mode runtimes are inherently lazy already.)
+* **Failure reporting.** In lazy mode a broken module only fails when
+  first used (class loads throw `ClassNotFoundException`, a warning with
+  the compiler diagnostics is logged once); in eager mode
+  (`-Dnetbeans.source.modules.eager=true`) enablement fails with an
+  `InvalidException` carrying the diagnostics and the module shows up in
+  the module system with problems.
 
 ### Build harness (nbbuild/templates/common.xml)
 
@@ -151,12 +169,20 @@ Modules that need extra care or should stay binary:
   or **code generation** (`web.jspparser`'s servlet-API rewriting, JavaCC/
   ANTLR grammars, ant-task compilation into `modules/ext`) - keep them
   binary, or teach the harness to run those steps at runtime.
-* **Modules compiling against javac internals** (`lib.nbjavac`) and modules
-  whose build resolves platform jars outside the module dependency model
-  (`htmlui` and the JavaFX platform) - both found by the live smoke test,
-  both kept binary. A per-module compiler-arguments manifest header (fed
-  from `javac.compilerargs` by the harness) would cover the add-exports
-  cases if ever needed.
+* **Modules compiling against the javac APIs** (the `requires.nb.javac`
+  family, 46 modules: `lib.nbjavac`, `java.source.base`, `java.sourceui`,
+  `java.editor`, `java.hints`, `refactoring.java`, `java.project.ui`, ...)
+  and modules whose build resolves platform jars outside the module
+  dependency model (`htmlui` and the JavaFX platform) - all found by the
+  live smoke tests, all kept binary. The javac family compiles against the
+  nb-javac fork's newer `com.sun.source`/`com.sun.tools.javac` APIs while
+  the running JDK's `jdk.compiler` module owns those packages, and the
+  classpath cannot shadow module-owned packages; the ant harness handles
+  this with `--limit-modules` (SetupLimitModules) hiding `jdk.compiler` -
+  replicating that in-process made javac pathologically slow, so these
+  modules remain binary for now. `htmlui` would need a per-module
+  compiler-arguments manifest header (fed from `javac.compilerargs` by the
+  harness) to cover such cases.
 * **OSGi bundles** consumed through the netigso bridge are foreign artifacts
   anyway.
 
@@ -178,18 +204,15 @@ Suggested stages:
    from source during startup (regenerating layers and service
    registrations via the runtime annotation processors), and a warm start
    on the same userdir reuses the cache with no recompilation at all.
-2. (done, mass conversion) 182 of the 262 modules of the Platform+Java
-   clusters are now source-only (64 Platform, 118 Java) - every module
-   with a plain ant build (bare `build.xml`, no annotation-processor
-   providers, no javahelp), plus three with benign custom targets
-   (`o.n.swing.tabcontrol` demo targets, `print`, `autoupdate.services`).
-   Library wrappers and processor providers stay binary, as do two
-   instructive failures found by the live smoke test: `lib.nbjavac`
-   (patches javac internals) and `htmlui` (compiles against the JavaFX
-   platform, whose jars are resolved by build-time plumbing the runtime
-   classpath model does not cover). A live platform start compiles 47
-   modules from source with zero failures; the warm start recompiles
-   nothing.
+2. (done, mass conversion) 137 of the 262 modules of the Platform+Java
+   clusters are now source-only (64 Platform, 73 Java) - every module with
+   a plain ant build (bare `build.xml`, no annotation-processor
+   providers, no javahelp) that does not compile against the javac APIs.
+   Three with benign custom targets are included (`o.n.swing.tabcontrol`
+   demo targets, `print`, `autoupdate.services`). Library wrappers,
+   processor providers, and the javac-API family stay binary (see below).
+   A live full-IDE start compiles the enabled source modules from source
+   with zero failures; warm starts recompile nothing.
 3. Processor providers, once their users are converted (today every one
    of them still has users in the not-yet-converted ide/extide clusters).
 4. Whole subsystems once their internal dependency subtree is fully

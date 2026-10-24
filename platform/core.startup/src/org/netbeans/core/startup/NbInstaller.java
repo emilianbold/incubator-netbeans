@@ -171,7 +171,11 @@ final class NbInstaller extends ModuleInstaller {
                 // documented to be called before systemClassLoader is ready, so the onus
                 // is on the module author to avoid anything dangerous there.
                 clazz = Class.forName(installClassName, false, m.getClassLoader());
-                if (clazz.getClassLoader() != m.getClassLoader()) {
+                if (clazz.getClassLoader() != m.getClassLoader()
+                        // source-only modules load classes through an inner
+                        // loader of the module's classloader - Module.owns
+                        // recognizes those
+                        && !m.owns(clazz)) { // NOI18N
                     ev.log(Events.WRONG_CLASS_LOADER, m, clazz, m.getClassLoader());
                 }
                 // Search for a validate() method; if there is none, do not resolve the class now!

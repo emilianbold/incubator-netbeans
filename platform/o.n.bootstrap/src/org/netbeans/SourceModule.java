@@ -21,6 +21,7 @@ package org.netbeans;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -28,46 +29,72 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.logging.Level;
 import org.openide.modules.Dependency;
 
-    /**
-     * A module shipped as source code only. The JAR layout is that of a regular
-     * module (complete manifest, resources at the root), except that it holds
-     * source files where a binary module holds compiled classes; the
-     * manifest must carry {@code OpenIDE-Module-Source: <runtime id>}
-     * ({@code true} meaning the built-in Java runtime).
-     * <p>
-     * When the module is enabled, a {@link SourceRuntime} compiles/materializes
-     * its sources on demand (see {@link SourceModuleCompiler}) into the user
-     * directory cache and the module classloader is built over the compiled
-     * output directory - which {@link JarClassLoader} supports natively, like
-     * for patched modules. The source JAR itself is deliberately <em>not</em>
-     * part of the classpath, so resources are never seen twice.
-     * <p>
-     * If the module is patched locally (or any of its dependencies changes), the
-     * cached compilation is detected as stale and the module is recompiled at the
-     * next enablement.
-     *
-     * @see SourceRuntime
-     * @see SourceModuleCompiler
-     * @since org.netbeans.base/1
-     */
+/**
+ * A module shipped as source code only. The JAR layout is that of a regular
+ * module (complete manifest, resources at the root), except that it holds
+ * source files where a binary module holds compiled classes; the
+ * manifest must carry {@code OpenIDE-Module-Source: <runtime id>}
+ * ({@code true} meaning the built-in Java runtime).
+ * <p>
+ * When the module is enabled, a {@link SourceRuntime} compiles/materializes
+ * its sources on demand (see {@link SourceModuleCompiler}) into the user
+ * directory cache and the module classloader is built over the compiled
+ * output directory - which {@link JarClassLoader} supports natively, like
+ * for patched modules. The source JAR itself is deliberately <em>not</em>
+ * part of the classpath, so resources are never seen twice.
+ * <p>
+ * Compilation is <em>lazy</em>: module enablement only creates the loader;
+ * the actual build happens on first use - the first class load, or the
+ * first resource lookup that needs generated output. Resources present in
+ * the source JAR (handwritten layers, icons, bundles in their plain form)
+ * are served straight from the JAR without compiling, since the compile
+ * would copy them verbatim anyway; the harness ships a
+ * {@code META-INF/generated-layer.hint} so that modules without generated
+ * layers can answer the eager startup layer lookup without compiling at
+ * all. Set {@code -Dnetbeans.source.modules.eager=true} to compile at
+ * enablement time instead (fail-fast behaviour).
+ * <p>
+ * If the module is patched locally (or any of its dependencies changes), the
+ * cached compilation is detected as stale and the module is recompiled at
+ * the next use.
+ *
+ * @see SourceRuntime
+ * @see SourceModuleCompiler
+ * @since org.netbeans.base/1
+ */
 class SourceModule extends StandardModule {
 
     /** Manifest header marking a module JAR as source-only; value: the runtime id. */
     public static final String SOURCE_HEADER = "OpenIDE-Module-Source"; // NOI18N
 
     /**
+     * Build-time hint entry telling whether the annotation processors
+     * generate a layer for this module ("layer=true"/"layer=false"), so
+     * that modules without generated layers can answer the eager startup
+     * lookup of {@code META-INF/generated-layer.xml} without compiling.
+     */
+    static final String LAYER_HINT_ENTRY = "META-INF/generated-layer.hint"; // NOI18N
+
+    /** The generated layer resource, looked up eagerly for every enabled module. */
+    private static final String GENERATED_LAYER = "META-INF/generated-layer.xml"; // NOI18N
+
+    /** Set to compile at enablement instead of first use. */
+    private static final String EAGER_PROP = "netbeans.source.modules.eager"; // NOI18N
+
+    /**
      * Directory with the compiled output of this module.
-     * Assigned in {@link #classLoaderUp} before the loader is created;
-     * also read by dependent source modules when they assemble their
-     * own compilation classpath.
+     * Assigned by {@link #ensureCompiled}; also read by dependent source
+     * modules when they assemble their own compilation classpath.
      */
     private File compiledClasses;
 
-    /** The source runtime responsible for this module, resolved at enablement. */
+    /** The source runtime responsible for this module, resolved at first use. */
     private SourceRuntime runtime;
 
     /** Use ModuleManager.create as a factory. */
@@ -96,20 +123,83 @@ class SourceModule extends StandardModule {
         return compiledClasses;
     }
 
+    /** The loader over the compiled output, once {@link #ensureCompiled} ran. */
+    private volatile ClassLoader realLoader;
+
+    /** Parent loaders of the module, for the lazily created real loader. */
+    private List<ClassLoader> moduleParents;
+
+    /** Cached compile failure, so failed compiles don't retry on every class load. */
+    private String compileFailure;
+
     /**
-     * Compile the module if needed, then bring up a classloader over the
-     * compiled output - the same construction as
-     * {@link StandardModule#classLoaderUp}, except that the compiled classes
-     * directory replaces the (source) module JAR. Interpreter-mode runtimes
-     * instead supply a loader serving the module directly from source form
-     * (see {@link SourceRuntime#createSourceLoader}).
+     * Compiles the module if needed and returns the output directory.
+     * Called lazily (first class load / generated-resource lookup) and by
+     * dependent source modules assembling their compile classpath - so
+     * laziness propagates down the dependency graph, compiling only what
+     * is actually used.
+     */
+    final synchronized File ensureCompiled() throws IOException {
+        if (compiledClasses != null) {
+            return compiledClasses;
+        }
+        if (compileFailure != null) {
+            throw new IOException(compileFailure);
+        }
+        org.openide.util.Mutex.Privileged mutex = getManager().mutexPrivileged();
+        mutex.enterReadAccess();
+        try {
+            if (runtime == null) {
+                runtime = resolveRuntime();
+            }
+            File output = SourceModuleCompiler.compileIfNeeded(this, runtime, computeClasspath());
+            // Patches first, then the freshly compiled classes, then any
+            // Class-Path extension JARs (resolved relative to the source JAR,
+            // which sits in the cluster's modules/ dir next to modules/ext/).
+            List<File> classp = new ArrayList<>(3);
+            Set<File> ptchs = findPatches();
+            if (ptchs != null) classp.addAll(ptchs);
+            classp.add(output);
+            ((StandardModuleData)data()).addCp(classp);
+            getManager().refineModulePath(this, classp);
+            try {
+                // The real loader needs the module's parent loaders: classes
+                // it defines resolve their references through it.
+                realLoader = createNewClassLoader(classp, moduleParents);
+            } catch (IllegalArgumentException iae) {
+                throw new IOException(iae);
+            }
+            // Make resources and ext-jar packages that only exist in the
+            // compiled output or the Class-Path extensions reachable
+            // through the lazy loader as well.
+            if (classloader instanceof LazySourceModuleClassLoader lazy) {
+                lazy.coverClasspath(classp);
+            }
+            compiledClasses = output;
+            compileFailure = null;
+        } catch (IOException ex) {
+            if (compileFailure == null) {
+                Util.err.log(Level.WARNING, "Compilation of source module {0} failed (will retry after reload): {1}", // NOI18N
+                        new Object[] {this, ex.getMessage()});
+            }
+            compileFailure = ex.getMessage() != null ? ex.getMessage() : ex.toString();
+            throw ex;
+        } finally {
+            mutex.exitReadAccess();
+        }
+        return compiledClasses;
+    }
+
+    /**
+     * Bring up the module loader. Interpreter-mode runtimes supply a loader
+     * serving the module directly from source form; bytecode mode creates a
+     * lazy loader that compiles on first use.
      */
     @Override
     protected void classLoaderUp(Set<Module> parents) throws IOException {
         if (Util.err.isLoggable(Level.FINE)) {
             Util.err.log(Level.FINE, "classLoaderUp on source module {0} with parents {1}", new Object[] {this, parents});
         }
-        runtime = resolveRuntime();
 
         // Find classloaders for dependent modules and parent to them.
         List<ClassLoader> loaders = new ArrayList<>(parents.size() + 1);
@@ -146,43 +236,36 @@ class SourceModule extends StandardModule {
 
         // Interpreter mode: the runtime serves classes and resources from
         // source form; nothing is materialized or cached.
-        ClassLoader sourceLoader = runtime.createSourceLoader(
-                this, computeClasspath(), loaders.toArray(new ClassLoader[0]));
-        if (sourceLoader != null) {
-            Util.err.log(Level.FINE, "source module {0} interpreted by {1}", new Object[] {this, runtime.getId()});
-            classloader = new RuntimeModuleClassLoader(sourceLoader, loaders.toArray(new ClassLoader[0]));
-            return;
+        String rtId = runtimeId(getManifest());
+        if (rtId != null && !"java".equals(rtId)) { // NOI18N
+            SourceRuntime rt = resolveRuntime();
+            ClassLoader sourceLoader = rt.createSourceLoader(
+                    this, computeClasspath(), loaders.toArray(new ClassLoader[0]));
+            if (sourceLoader != null) {
+                runtime = rt;
+                Util.err.log(Level.FINE, "source module {0} interpreted by {1}", new Object[] {this, rt.getId()});
+                classloader = new RuntimeModuleClassLoader(sourceLoader, loaders.toArray(new ClassLoader[0]));
+                return;
+            }
         }
 
-        // Bytecode mode: make sure we are compiled and up to date before
-        // anything looks for classes in this module.
-        compiledClasses = SourceModuleCompiler.compileIfNeeded(this, runtime, computeClasspath());
-
-        // Patches first, then the freshly compiled classes, then any
-        // Class-Path extension JARs (resolved relative to the source JAR,
-        // which sits in the cluster's modules/ dir next to modules/ext/).
-        List<File> classp = new ArrayList<>(3);
-        Set<File> ptchs = findPatches();
-        if (ptchs != null) classp.addAll(ptchs);
-        classp.add(compiledClasses);
-
-        ((StandardModuleData)data()).addCp(classp);
-
-        // possibly inject some patches
-        getManager().refineModulePath(this, classp);
-
-        // #27853
-        ClassLoader cld = getManager().refineClassLoader(this, loaders);
-        // the classloader may be shared, if this module is a fragment
-        if (cld != null) {
-            classloader = cld;
-        } else {
-            try {
-                classloader = createNewClassLoader(classp, loaders);
-            } catch (IllegalArgumentException iae) {
-                // Should not happen, but just in case.
-                throw new IOException(iae);
+        // Bytecode mode. The built-in Java runtime compiles lazily: enablement
+        // only creates the loader, the build happens on first use (or right
+        // here in fail-fast mode). Non-Java runtimes may generate arbitrary
+        // output the lazy loader cannot classify, so they compile eagerly at
+        // enablement and use the ordinary module classloader.
+        realLoader = null;
+        compiledClasses = null;
+        compileFailure = null;
+        moduleParents = loaders;
+        if (rtId == null || "java".equals(rtId)) { // NOI18N
+            classloader = new LazySourceModuleClassLoader(loaders.toArray(new ClassLoader[0]));
+            if (Boolean.getBoolean(EAGER_PROP)) {
+                ensureCompiled();
             }
+        } else {
+            ensureCompiled();
+            classloader = realLoader;
         }
     }
 
@@ -269,11 +352,14 @@ class SourceModule extends StandardModule {
             }
             if (parent instanceof SourceModule) {
                 // A source module: compile against its compiled output
-                // (already brought up, since dependencies are enabled first),
+                // (compiling it first if needed - laziness propagates),
                 // plus its patches and Class-Path extensions.
-                File classes = ((SourceModule) parent).getCompiledClasses();
-                if (classes != null) {
-                    cp.add(classes);
+                SourceModule sm = (SourceModule) parent;
+                try {
+                    cp.add(sm.ensureCompiled());
+                } catch (IOException ex) {
+                    Util.err.log(Level.WARNING, "Cannot compile dependency {0} of {1}: {2}", // NOI18N
+                            new Object[] {parent, this, ex});
                 }
                 for (File f : parent.getAllJars()) {
                     if (!f.equals(parent.getJarFile())) {
@@ -283,15 +369,44 @@ class SourceModule extends StandardModule {
             } else {
                 cp.addAll(parent.getAllJars());
             }
+            // A fragment carries no classes of its own; its host's JARs
+            // (including Class-Path extensions) provide them, e.g. the
+            // javac API jars for lib.nbjavac/lib.javacapi.
+            String fragmentHost = null;
+            try {
+                Manifest parentManifest = parent.getManifest();
+                if (parentManifest != null) {
+                    fragmentHost = parentManifest.getMainAttributes().getValue("OpenIDE-Module-Fragment-Host"); // NOI18N
+                }
+            } catch (RuntimeException ex) {
+                Util.err.log(Level.FINE, "Cannot read manifest of {0}", parent); // NOI18N
+            }
+            if (fragmentHost != null) {
+                String hostName = (String) Util.parseCodeName(fragmentHost)[0];
+                Module host = getManager().get(hostName);
+                if (host != null && visited.add(hostName)) {
+                    cp.addAll(host.getAllJars());
+                    collectDependencyJars(host, cp, visited);
+                }
+            }
+            // Conversely, a host's classloader merges its fragments' JARs
+            // (including their Class-Path extensions), e.g. the nb-javac
+            // API jars attached to libs.javacapi.
+            for (Module frag : getManager().getAttachedFragments(parent)) {
+                if (visited.add(frag.getCodeNameBase())) {
+                    cp.addAll(frag.getAllJars());
+                    collectDependencyJars(frag, cp, visited);
+                }
+            }
             collectDependencyJars(parent, cp, visited);
         }
     }
 
     @Override
     public void reload() throws IOException {
-        // The recompile-on-enable machinery will pick up any changes:
+        // The recompile-on-use machinery will pick up any changes:
         // the stamp check in SourceModuleCompiler compares against the
-        // source JAR contents afresh on every classLoaderUp.
+        // source JAR contents afresh on every compilation.
         super.reload();
     }
 
@@ -301,10 +416,215 @@ class SourceModule extends StandardModule {
         return s;
     }
 
+    // ---------------------------------------------------------------------
+    // Resource laziness support
+    // ---------------------------------------------------------------------
+
+    /** Whether the resource is (or may be) produced by annotation processing. */
+    static boolean isGeneratedResource(String name) {
+        return name.endsWith("Bundle.properties") // NOI18N
+                || name.startsWith("META-INF/services/") // NOI18N
+                || name.startsWith("META-INF/namedservices/") // NOI18N
+                || name.equals("META-INF/namedservices.index"); // NOI18N
+    }
+
+    /**
+     * Class loader for bytecode-mode source modules. It answers from the
+     * source JAR where possible (the compile would copy those entries
+     * verbatim) and compiles the module on everything else - so an enabled
+     * but unused module never pays for compilation.
+     */
+    private final class LazySourceModuleClassLoader extends ProxyClassLoader implements Util.ModuleProvider {
+
+        /** Entry names present in the source JAR (no directories, no classes, no manifest). */
+        private final Set<String> jarEntries;
+        /** Cached answer of the build-time layer hint, or null if unread. */
+        private String layerHint;
+
+        LazySourceModuleClassLoader(ClassLoader[] parents) throws IOException {
+            super(parents, false);
+            Set<String> entries = new HashSet<>();
+            Set<String> packages = new HashSet<>();
+            try (JarFile jf = new JarFile(getJarFile())) {
+                Enumeration<JarEntry> en = jf.entries();
+                while (en.hasMoreElements()) {
+                    String n = en.nextElement().getName();
+                    if (n.endsWith("/") || n.equals("META-INF/MANIFEST.MF") || n.endsWith(".class")) { // NOI18N
+                        continue;
+                    }
+                    entries.add(n);
+                    int slash = n.lastIndexOf('/');
+                    if (slash > 0) {
+                        packages.add(n.substring(0, slash).replace('/', '.'));
+                    }
+                }
+            }
+            // Service registrations do not exist in the source JAR (they are
+            // generated), but lookups for them must route here to trigger
+            // the lazy compile; the compiled output adds exact coverage for
+            // the rest (e.g. nested namedservices) once it exists.
+            packages.add("META-INF.services"); // NOI18N
+            packages.add("META-INF.namedservices"); // NOI18N
+            jarEntries = entries;
+            addCoveredPackages(packages);
+        }
+
+        /** Extends coverage with the packages of the compiled output and
+         *  Class-Path extensions, so references resolved through the inner
+         *  loader (ext-jar packages in particular) route back here. */
+        void coverClasspath(List<File> classp) {
+            Set<String> packages = new HashSet<>();
+            for (File f : classp) {
+                if (f.isDirectory()) {
+                    collectPackages(f, "", packages);
+                } else if (f.isFile() && f.getName().endsWith(".jar")) { // NOI18N
+                    try (JarFile jf = new JarFile(f)) {
+                        Enumeration<JarEntry> en = jf.entries();
+                        while (en.hasMoreElements()) {
+                            String n = en.nextElement().getName();
+                            if (n.endsWith("/") || n.endsWith(".class")) { // NOI18N
+                                continue;
+                            }
+                            int slash = n.lastIndexOf('/');
+                            if (slash > 0) {
+                                packages.add(n.substring(0, slash).replace('/', '.'));
+                            }
+                        }
+                    } catch (IOException ex) {
+                        Util.err.log(Level.FINE, "Cannot enumerate packages of {0}", f); // NOI18N
+                    }
+                }
+            }
+            addCoveredPackages(packages);
+        }
+
+        private static void collectPackages(File dir, String prefix, Set<String> out) {
+            File[] kids = dir.listFiles();
+            if (kids == null) {
+                return;
+            }
+            for (File kid : kids) {
+                if (kid.isDirectory()) {
+                    collectPackages(kid, prefix + kid.getName() + "/", out); // NOI18N
+                } else {
+                    String n = prefix + kid.getName();
+                    int slash = n.lastIndexOf('/');
+                    if (slash > 0) {
+                        out.add(n.substring(0, slash).replace('/', '.'));
+                    }
+                }
+            }
+        }
+
+        public @Override Module getModule() {
+            return SourceModule.this;
+        }
+
+        /** Classes always trigger the lazy compile. */
+        protected @Override Class<?> doLoadClass(String pkg, String name) {
+            try {
+                ensureCompiled();
+                return realLoader().loadClass(name);
+            } catch (IOException | ClassNotFoundException ex) {
+                return null;
+            }
+        }
+
+        public @Override URL findResource(String name) {
+            if (GENERATED_LAYER.equals(name)) {
+                // Eagerly looked up for every enabled module at startup.
+                // The build-time hint lets layer-less modules stay uncompiled.
+                if ("layer=false".equals(layerHint())) { // NOI18N
+                    return null;
+                }
+            }
+            if (GENERATED_LAYER.equals(name) || isGeneratedResource(name)) {
+                try {
+                    ensureCompiled();
+                    return realLoader().getResource(name);
+                } catch (IOException ex) {
+                    return null;
+                }
+            }
+            // Present in the source JAR? Serve it verbatim - the compile
+            // would copy the same bytes into its output anyway.
+            if (jarEntries.contains(name)) {
+                return jarUrl(name);
+            }
+            return null;
+        }
+
+        public @Override Enumeration<URL> findResources(String name) throws IOException {
+            if (GENERATED_LAYER.equals(name) || isGeneratedResource(name)) {
+                if (GENERATED_LAYER.equals(name) && "layer=false".equals(layerHint())) { // NOI18N
+                    return java.util.Collections.emptyEnumeration();
+                }
+                ensureCompiled();
+                return realLoader().getResources(name);
+            }
+            if (jarEntries.contains(name)) {
+                return java.util.Collections.enumeration(java.util.Collections.singleton(jarUrl(name)));
+            }
+            return java.util.Collections.emptyEnumeration();
+        }
+
+        public @Override void destroy() {
+            super.destroy();
+            ClassLoader rl = realLoader;
+            if (rl instanceof ProxyClassLoader pcl) {
+                pcl.destroy();
+            }
+        }
+
+        /** Reads the build-time layer hint ("layer=true"/"false"/"unknown"). */
+        private String layerHint() {
+            if (layerHint == null) {
+                layerHint = "layer=unknown"; // NOI18N
+                if (jarEntries.contains(LAYER_HINT_ENTRY)) {
+                    try (JarFile jf = new JarFile(getJarFile())) {
+                        InputStream is = jf.getInputStream(jf.getEntry(LAYER_HINT_ENTRY));
+                        if (is != null) {
+                            try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
+                                byte[] b = new byte[256];
+                                int len;
+                                while ((len = is.read(b)) != -1) {
+                                    baos.write(b, 0, len);
+                                }
+                                layerHint = baos.toString("UTF-8").trim(); // NOI18N
+                            }
+                        }
+                    } catch (IOException ex) {
+                        Util.err.log(Level.FINE, "Cannot read {0} of {1}", // NOI18N
+                                new Object[] {LAYER_HINT_ENTRY, getJarFile()});
+                    }
+                }
+            }
+            return layerHint;
+        }
+
+        private URL jarUrl(String name) {
+            try {
+                return new URL("jar:" + getJarFile().toURI() + "!/" + name); // NOI18N
+            } catch (java.net.MalformedURLException ex) {
+                return null;
+            }
+        }
+
+        public @Override String toString() {
+            return "LazySourceModuleCL@" + Integer.toHexString(System.identityHashCode(this)) // NOI18N
+                    + "[" + getCodeNameBase() + (compiledClasses != null ? "" : ",uncompiled") + "]"; // NOI18N
+        }
+    }
+
+    /** Direct access for the loader inner classes. */
+    ClassLoader realLoader() {
+        return realLoader;
+    }
+
     /**
      * Class loader for interpreter-mode source modules: a standard
      * multi-parented module classloader (package coverage, resource
-     * delegation policy, permissions, module identity) whose "own"
+     * delegation policy, module identity) whose "own"
      * classes and resources come from the runtime's loader, which serves
      * them directly from source form.
      */
@@ -361,8 +681,8 @@ class SourceModule extends StandardModule {
     /** Packages present in the module's source JAR, for classloader coverage. */
     private Set<String> packagesOfSourceJar() {
         Set<String> pkgs = new HashSet<>();
-        try (java.util.jar.JarFile jf = new java.util.jar.JarFile(getJarFile())) {
-            java.util.Enumeration<java.util.jar.JarEntry> en = jf.entries();
+        try (JarFile jf = new JarFile(getJarFile())) {
+            Enumeration<JarEntry> en = jf.entries();
             while (en.hasMoreElements()) {
                 String n = en.nextElement().getName();
                 if (n.endsWith("/") || n.equals("META-INF/MANIFEST.MF")) { // NOI18N
@@ -376,7 +696,7 @@ class SourceModule extends StandardModule {
                 }
             }
         } catch (IOException ex) {
-            Util.err.log(java.util.logging.Level.WARNING, "Cannot enumerate packages of " + getJarFile(), ex);
+            Util.err.log(Level.WARNING, "Cannot enumerate packages of " + getJarFile(), ex);
         }
         return pkgs;
     }

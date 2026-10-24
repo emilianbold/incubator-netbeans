@@ -93,6 +93,13 @@ final class JavaSourceRuntime extends SourceRuntime {
         options.add(srcDir.getPath());
         options.add("-classpath"); // NOI18N
         options.add(joinPaths(classpath));
+        // Note: modules compiling against javac internals (anything with
+        // the javacapi wrapper / nb-javac ext jars on its classpath) do not
+        // fit the runtime compile: the ant harness builds them with
+        // --limit-modules hiding jdk.compiler (SetupLimitModules), but
+        // replicating that in-process made javac pathologically slow
+        // (hundreds of seconds per module). Such modules stay binary; see
+        // SOURCE-ONLY-MODULES.md.
         // Processors (layer generation, @ServiceProvider, @NbBundle.Messages, ...)
         // are shipped inside the dependency JARs themselves, exactly like in
         // an ant build - no -A options are used by the harness either.
@@ -127,6 +134,7 @@ final class JavaSourceRuntime extends SourceRuntime {
         }
     }
 
+
     private static String formatDiagnostics(DiagnosticCollector<JavaFileObject> diagnostics) {
         StringBuilder sb = new StringBuilder();
         int count = 0;
@@ -154,7 +162,7 @@ final class JavaSourceRuntime extends SourceRuntime {
                 || (v.feature() == 11 && v.update() >= 21);
     }
 
-    private static String joinPaths(List<File> files) {
+    static String joinPaths(List<File> files) {
         StringBuilder sb = new StringBuilder();
         for (File f : files) {
             if (sb.length() > 0) {

@@ -4,4 +4,3 @@ OpenIDE-Module-Layer: org/netbeans/modules/spring/beans/resources/layer.xml
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/spring/beans/resources/Bundle.properties
 OpenIDE-Module-Implementation-Version: 1
 OpenIDE-Module-Requires: org.springframework.Library
-OpenIDE-Module-Source: true

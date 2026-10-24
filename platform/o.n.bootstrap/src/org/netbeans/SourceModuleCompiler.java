@@ -137,7 +137,8 @@ final class SourceModuleCompiler {
             String detail = ex.getMessage();
             throw new IOException(
                 "Compilation of source module " + cnb + " failed" // NOI18N
-                + (detail != null && !detail.isEmpty() ? ":\n" + detail : ""), ex);
+                + (detail != null && !detail.isEmpty() ? ":\n" + detail : "")
+                + "\n[classpath: " + JavaSourceRuntime.joinPaths(classpath) + "]", ex);
         }
 
         writeStamp(stampFile, stamp);
@@ -219,7 +220,8 @@ final class SourceModuleCompiler {
      * Extracts all JAR entries except the manifest into the given directory.
      * Compiled classes are skipped too: hybrid modules (transition form,
      * packaged with classes for their binary build-time dependents) carry
-     * them, but the compilation output must come from sources alone.
+     * them, but the compilation output must come from sources alone. The
+     * build-time layer hint is build metadata, not module content.
      */
     private static void extractSources(File jar, File targetDir) throws IOException {
         try (JarFile jarFile = new JarFile(jar)) {
@@ -227,7 +229,8 @@ final class SourceModuleCompiler {
             while (entries.hasMoreElements()) {
                 JarEntry entry = entries.nextElement();
                 if (entry.isDirectory() || MANIFEST_ENTRY.equals(entry.getName())
-                        || entry.getName().endsWith(".class")) { // NOI18N
+                        || entry.getName().endsWith(".class") // NOI18N
+                        || entry.getName().equals("META-INF/generated-layer.hint")) { // NOI18N
                     continue;
                 }
                 File target = new File(targetDir, entry.getName());

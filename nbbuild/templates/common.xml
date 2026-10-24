@@ -333,7 +333,26 @@
     <extension-point name="-post-jar" depends="-pre-jar,-do-jar"/>
     <target name="jar" depends="-pre-jar,-do-jar,-post-jar"/>
     <target name="-do-jar" depends="init,compile,jar-prep,-pre-jar,-do-jar-source-pure,-do-jar-source-hybrid,-do-jar-binary" unless="is.jar.uptodate"/>
-    <target name="-do-jar-source-pure" depends="init,compile,jar-prep,-pre-jar" if="source.module.pure.pack" unless="is.jar.uptodate">
+    <!-- Build hint for source modules: tells the module system whether the
+         annotation processors generated a layer, so that modules without
+         generated layers can answer the eager startup layer lookup without
+         compiling at all (lazy compilation). Pure modules are not compiled
+         at build time, so their hint is conservatively "unknown". -->
+    <target name="-source-module-hints" if="source.module.pack" depends="init">
+        <mkdir dir="${build.dir}/source-hints/META-INF"/>
+        <condition property="source.module.layer.hint" value="layer=true">
+            <and>
+                <isfalse value="${source.module.pure}"/>
+                <available file="${build.classes.dir}/META-INF/generated-layer.xml"/>
+            </and>
+        </condition>
+        <condition property="source.module.layer.hint" value="layer=unknown">
+            <istrue value="${source.module.pure}"/>
+        </condition>
+        <property name="source.module.layer.hint" value="layer=false"/>
+        <echo file="${build.dir}/source-hints/META-INF/generated-layer.hint" message="${source.module.layer.hint}"/>
+    </target>
+    <target name="-do-jar-source-pure" depends="init,compile,jar-prep,-pre-jar,-source-module-hints" if="source.module.pure.pack" unless="is.jar.uptodate">
         <!-- Pure source-only module: no classes at all, just the src/ tree
              (sources + resources). Only safe when no binary module depends
              on this one. The manifest must carry OpenIDE-Module-Source: true;
@@ -341,9 +360,10 @@
              The module system compiles this JAR on demand at runtime. -->
         <jarwithmoduleattributes jarfile="${cluster}/${module.jar}" compress="${build.package.compress}" index="${build.package.index}" manifest="${manifest.mf}" stamp="${cluster}/.lastModified">
             <fileset dir="${src.dir}" excludes="**/*.form,**/package.html,**/doc-files/"/>
+            <fileset dir="${build.dir}/source-hints"/>
         </jarwithmoduleattributes>
     </target>
-    <target name="-do-jar-source-hybrid" depends="init,compile,jar-prep,-pre-jar" if="source.module.hybrid.pack" unless="is.jar.uptodate">
+    <target name="-do-jar-source-hybrid" depends="init,compile,jar-prep,-pre-jar,-source-module-hints" if="source.module.hybrid.pack" unless="is.jar.uptodate">
         <!-- Hybrid source module: compiled classes as usual (so that binary
              dependents keep building) plus the complete source tree. At
              runtime the module system compiles from the sources and ignores
@@ -361,6 +381,7 @@
                 <exclude name="**/Bundle.properties"/>
             </fileset>
             <fileset dir="${src.dir}" includes="**/*.java,META-INF/services/**,META-INF/namedservices/**,**/Bundle.properties"/>
+            <fileset dir="${build.dir}/source-hints"/>
         </jarwithmoduleattributes>
     </target>
     <target name="-do-jar-binary" depends="init,compile,jar-prep,-pre-jar" if="binary.module.pack" unless="is.jar.uptodate">
