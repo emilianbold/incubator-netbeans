@@ -45,7 +45,7 @@ public class ModuleFactory {
         // Source-only modules are compiled on demand and loaded from the
         // compilation output directory (see SourceModule).
         Manifest mf = mgr.loadManifest(jar);
-        if (SourceModule.isSourceModule(mf)) {
+        if (SourceModule.runtimeId(mf) != null) {
             Module m = new SourceModule(mgr, ev, jar, history, reloadable, autoload, eager);
             m.dataWithCheck();
             return m;

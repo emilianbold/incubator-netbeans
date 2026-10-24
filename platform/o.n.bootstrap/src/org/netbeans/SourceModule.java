@@ -32,48 +32,63 @@ import java.util.jar.Manifest;
 import java.util.logging.Level;
 import org.openide.modules.Dependency;
 
-/**
- * A module shipped as source code only. The JAR layout is that of a regular
- * module (complete manifest, resources at the root), except that it holds
- * {@code *.java} files where a binary module holds compiled classes; the
- * manifest must carry {@code OpenIDE-Module-Source: true}.
- * <p>
- * When the module is enabled, its sources are compiled on demand (see
- * {@link SourceModuleCompiler}) into the user directory cache and the module
- * classloader is built over the compiled output directory - which
- * {@link JarClassLoader} supports natively, like for patched modules. The
- * source JAR itself is deliberately <em>not</em> part of the classpath, so
- * handwritten resources are never seen twice (they are copied into the
- * compilation output, as the ant harness would).
- * <p>
- * If the module is patched locally (or any of its dependencies changes), the
- * cached compilation is detected as stale and the module is recompiled at the
- * next enablement.
- *
- * @see SourceModuleCompiler
- * @since org.netbeans.base/1
- */
+    /**
+     * A module shipped as source code only. The JAR layout is that of a regular
+     * module (complete manifest, resources at the root), except that it holds
+     * source files where a binary module holds compiled classes; the
+     * manifest must carry {@code OpenIDE-Module-Source: <runtime id>}
+     * ({@code true} meaning the built-in Java runtime).
+     * <p>
+     * When the module is enabled, a {@link SourceRuntime} compiles/materializes
+     * its sources on demand (see {@link SourceModuleCompiler}) into the user
+     * directory cache and the module classloader is built over the compiled
+     * output directory - which {@link JarClassLoader} supports natively, like
+     * for patched modules. The source JAR itself is deliberately <em>not</em>
+     * part of the classpath, so resources are never seen twice.
+     * <p>
+     * If the module is patched locally (or any of its dependencies changes), the
+     * cached compilation is detected as stale and the module is recompiled at the
+     * next enablement.
+     *
+     * @see SourceRuntime
+     * @see SourceModuleCompiler
+     * @since org.netbeans.base/1
+     */
 class SourceModule extends StandardModule {
 
-    /** Manifest header marking a module JAR as source-only. Value: {@code true}. */
+    /** Manifest header marking a module JAR as source-only; value: the runtime id. */
     public static final String SOURCE_HEADER = "OpenIDE-Module-Source"; // NOI18N
 
     /**
-     * Directory with the compiled classes of this module.
+     * Directory with the compiled output of this module.
      * Assigned in {@link #classLoaderUp} before the loader is created;
      * also read by dependent source modules when they assemble their
      * own compilation classpath.
      */
     private File compiledClasses;
 
+    /** The source runtime responsible for this module, resolved at enablement. */
+    private SourceRuntime runtime;
+
     /** Use ModuleManager.create as a factory. */
     public SourceModule(ModuleManager mgr, Events ev, File jar, Object history, boolean reloadable, boolean autoload, boolean eager) throws IOException {
         super(mgr, ev, jar, history, reloadable, autoload, eager);
     }
 
-    /** Whether the given manifest marks a source-only module. */
-    static boolean isSourceModule(Manifest mf) {
-        return mf != null && Boolean.parseBoolean(mf.getMainAttributes().getValue(SOURCE_HEADER));
+    /**
+     * The runtime id requested by the given manifest, or null for a plain
+     * binary module. {@code true} is normalized to the Java runtime.
+     */
+    static String runtimeId(Manifest mf) {
+        if (mf == null) {
+            return null;
+        }
+        String value = mf.getMainAttributes().getValue(SOURCE_HEADER);
+        if (value == null) {
+            return null;
+        }
+        value = value.trim();
+        return "true".equalsIgnoreCase(value) ? "java" : value; // NOI18N
     }
 
     /** Directory this module was compiled into, or null if not yet compiled. */
@@ -92,9 +107,10 @@ class SourceModule extends StandardModule {
         if (Util.err.isLoggable(Level.FINE)) {
             Util.err.log(Level.FINE, "classLoaderUp on source module {0} with parents {1}", new Object[] {this, parents});
         }
+        runtime = resolveRuntime();
         // Make sure we are compiled and up to date before anything looks
         // for classes in this module.
-        compiledClasses = SourceModuleCompiler.compileIfNeeded(this, computeClasspath());
+        compiledClasses = SourceModuleCompiler.compileIfNeeded(this, runtime, computeClasspath());
 
         // Find classloaders for dependent modules and parent to them.
         List<ClassLoader> loaders = new ArrayList<>(parents.size() + 1);
@@ -155,6 +171,29 @@ class SourceModule extends StandardModule {
                 throw new IOException(iae);
             }
         }
+    }
+
+    /**
+     * Resolves the source runtime requested by this module's manifest.
+     * Non-Java runtimes must be backed by an enabled module, so the
+     * manifest must require the matching token - otherwise the module
+     * system has no reason to enable the runtime first.
+     */
+    private SourceRuntime resolveRuntime() throws IOException {
+        String id = runtimeId(getManifest());
+        String token = SourceRuntime.TOKEN_PREFIX + id;
+        boolean javaRuntime = "java".equals(id); // NOI18N
+        if (!javaRuntime) {
+            String requires = getManifest().getMainAttributes().getValue("OpenIDE-Module-Requires"); // NOI18N
+            if (requires == null || !requires.contains(token)) {
+                throw new IOException(
+                    "Source module " + getCodeNameBase() + " uses runtime '" + id + "' " // NOI18N
+                    + "but does not require the token " + token + ". " // NOI18N
+                    + "Declare OpenIDE-Module-Requires: " + token // NOI18N
+                    + " and have a module providing the token (OpenIDE-Module-Provides: " + token + ")."); // NOI18N
+            }
+        }
+        return SourceRuntime.find(getManager(), id);
     }
 
     /**

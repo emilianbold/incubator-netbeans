@@ -24,10 +24,12 @@ instead of class files has interesting properties:
 
 A source-only module is an ordinary module JAR with the same layout a binary
 module has - complete manifest, resources at the root - except that it holds
-`*.java` files where a binary module holds compiled classes. The manifest
-must carry one extra header:
+source files where a binary module holds compiled classes. The manifest
+must carry one extra header, whose value names the **source runtime**
+responsible for compiling/materializing it:
 
-    OpenIDE-Module-Source: true
+    OpenIDE-Module-Source: true        # (or "java") the built-in Java runtime
+    OpenIDE-Module-Source: clojure     # a registered non-Java runtime (see below)
 
 Two variants exist:
 
@@ -202,68 +204,81 @@ Suggested stages:
 Nothing in the design is Java-specific: the module system only needs
 *somebody* to turn a module's source form into something loadable, plus
 the usual manifest/dependencies/layers. The `OpenIDE-Module-Source` header
-can therefore carry the id of the **source runtime** responsible for the
+therefore carries the id of the **source runtime** responsible for the
 module:
 
     OpenIDE-Module-Source: true        # Java, built into the Platform (as shipped today)
     OpenIDE-Module-Source: java        # ditto, explicit
     OpenIDE-Module-Source: clojure     # a registered SourceRuntime with id "clojure" is required
 
-An SPI in `o.n.bootstrap` (same pattern as `NetigsoFramework`: abstract
-base in the bootstrap, implementation in a regular module, bound lazily):
+The `SourceRuntime` SPI lives in `o.n.bootstrap` (same pattern as
+`NetigsoFramework`: abstract base in the bootstrap, implementation in a
+regular module):
 
 ```java
 public abstract class SourceRuntime {
+    public static final String TOKEN_PREFIX = "org.netbeans.modules.source.runtime.";
     /** Identity, e.g. "java", "clojure", "jruby". */
     public abstract String getId();
     /** Token the provider module must declare in OpenIDE-Module-Provides. */
-    public final String getToken() { return "org.netbeans.modules.source.runtime/" + getId(); }
+    public final String getToken() { return TOKEN_PREFIX + getId(); }
     /** Version string included in the staleness stamp (e.g. compiler version). */
     public abstract String getVersion();
-    /** Turn the module's sources into something loadable. */
-    public abstract Materialized materialize(Module m, File cacheDir, List<File> classpath) throws IOException;
-    /** Or take over classloading entirely (defaults to a loader over the materialized output). */
-    public ClassLoader createClassLoader(Module m, Materialized output, List<ClassLoader> parents) { ... }
+    /** Build the extracted sources into the (empty) output directory. */
+    public abstract void build(File srcDir, File outputDir, List<File> classpath) throws IOException;
+    /** Finds a runtime: "true"/"java" -> built-in; otherwise enabled token providers. */
+    public static SourceRuntime find(ModuleManager mgr, String id) throws IOException;
 }
 ```
 
-`Materialized` is either a directory of bytecode/resources (loaded with
-the existing `JarClassLoader`, exactly like the Java path), or a marker
-telling the module system to use the runtime's own classloader (for
+The built-in Java runtime (`JavaSourceRuntime`) is what the Platform
+supports out of the box - it needs nothing but the JDK. Runtimes for
+other languages are regular modules: they declare
+`OpenIDE-Module-Provides: org.netbeans.modules.source.runtime.<id>`,
+register the implementation in
+`META-INF/services/org.netbeans.SourceRuntime`, and are found through the
+*enabled* module that provides the token. A module using such a runtime
+must declare the matching `OpenIDE-Module-Requires` token (validated with
+an instructive error otherwise), which makes the existing dependency
+resolver enable the runtime before its source modules - the
+chicken-and-egg solved with zero new ordering concepts.
+
+The build contract is deliberately simple: `build()` receives the
+extracted source tree and an empty output directory and produces whatever
+the module classloader should load - class files and resources in the
+ordinary module JAR layout. The output does **not** need to be a JAR; a
+bytecode directory already works (that is exactly what the Java path
+loads). Everything else is language-agnostic and handled by the driver
+(`SourceModuleCompiler`): manifest and dependency semantics, staleness
+stamping (source digest + classpath signatures + `getVersion()`),
+extraction, patches, classloader construction and failure reporting
+through module problems. A dynamic-language runtime can emit
+`META-INF/generated-layer.xml` and `META-INF/services/*` during the build
+(or bridge the language's own registration idioms to the layer), so a
+Clojure module can register actions and lookups just like a Java one.
+
+This is covered by unit tests with a simulated non-Java language
+(`SourceRuntimeTest`): a provider module registers a `DummyRuntime`
+through the token/service mechanism, a source module with
+`OpenIDE-Module-Source: dummy` is materialized by it, a runtime version
+change invalidates the cache, and misconfigured modules (missing token
+requirement, token provided but no runtime registered) get instructive
+errors.
+
+Remaining follow-ups: a real non-JVM runtime (Clojure is the natural first
+candidate - AOT compilation to a bytecode directory fits the contract
+unchanged), and an optional classloader-takeover extension of the SPI for
 in-memory compilers such as JRuby's, or interpreters that never produce
-files). The materialized form does **not** need to be a JAR - a cache
-directory already works; a runtime may generate one only if it wants to.
-
-Resolution and enablement order come for free from the existing dependency
-system: the header value implies a token requirement
-(`OpenIDE-Module-Requires: org.netbeans.modules.source.runtime/clojure`),
-and runtime provider modules declare the matching `OpenIDE-Module-Provides`
-token. The resolver then always enables the runtime before its source
-modules, with no new ordering concepts. The Java runtime is the one
-special case: it is built into the Platform and registered by
-`ModuleFactory` directly (it needs nothing but the JDK and the bootstrap
-itself), so plain `true` needs no provider module.
-
-Everything else is language-agnostic already: manifest and dependency
-semantics, staleness stamping (source digest + classpath signatures +
-`getVersion()`), patches, failure reporting through module problems, and
-layer/service registration - a dynamic-language runtime can emit
-`META-INF/generated-layer.xml` and `META-INF/services/*` during
-materialization (or bridge the language's own registration idioms to the
-layer), so a Clojure module can register actions and lookups just like a
-Java one.
-
-Follow-up work for this direction: extract the Java path in
-`SourceModuleCompiler` behind the `SourceRuntime` SPI, add the
-registry/token wiring in `ModuleManager`, and prototype one non-JVM
-runtime (Clojure is the natural first candidate: AOT compilation to a
-bytecode directory fits `Materialized` unchanged).
+files.
 
 ## Pointers
 
 * Runtime: `platform/o.n.bootstrap/src/org/netbeans/SourceModule.java`,
-  `SourceModuleCompiler.java`, `ModuleFactory.java`,
-  `StandardModule.java` (`findPatches` visibility).
-* Tests: `platform/o.n.bootstrap/test/unit/src/org/netbeans/SourceModuleTest.java`.
+  `SourceRuntime.java` (SPI), `JavaSourceRuntime.java` (built-in),
+  `SourceModuleCompiler.java` (language-agnostic driver),
+  `ModuleFactory.java`, `StandardModule.java` (`findPatches` visibility).
+* Tests: `platform/o.n.bootstrap/test/unit/src/org/netbeans/SourceModuleTest.java`
+  (Java path), `SourceRuntimeTest.java` (SPI with a simulated
+  non-Java runtime).
 * Harness: `nbbuild/templates/common.xml` (`-do-jar-source-pure`,
   `-do-jar-source-hybrid`, `-check-compile`).
