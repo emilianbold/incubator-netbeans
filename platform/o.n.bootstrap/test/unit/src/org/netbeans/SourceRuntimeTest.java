@@ -54,6 +54,8 @@ public class SourceRuntimeTest extends SetupHid {
 
     private File providerJar;
     private File langJar;
+    private File interpProviderJar;
+    private File langInterpJar;
 
     protected @Override void setUp() throws Exception {
         super.setUp();
@@ -62,6 +64,10 @@ public class SourceRuntimeTest extends SetupHid {
         makeRuntimeModule(providerJar, true);
         langJar = new File(jars, "lang-module.jar");
         makeLanguageModule(langJar, true);
+        interpProviderJar = new File(jars, "interp-runtime.jar");
+        makeInterpreterRuntimeModule(interpProviderJar);
+        langInterpJar = new File(jars, "lang-interp-module.jar");
+        makeInterpretedModule(langInterpJar);
     }
 
     protected @Override void tearDown() throws Exception {
@@ -163,6 +169,55 @@ public class SourceRuntimeTest extends SetupHid {
 
     private ModuleManager newManager() {
         return new ModuleManager(new MockModuleInstaller(), new MockEvents());
+    }
+
+    /**
+     * Interpreter mode: the module is plain source code served directly
+     * from the JAR - classes defined on demand by the runtime, resources
+     * (including service registrations) read from source form - and
+     * nothing is ever materialized to disk.
+     */
+    public void testInterpreterRuntimeServesModuleFromSourceForm() throws Exception {
+        ModuleManager mgr = newManager();
+        Module langMod;
+        mgr.mutexPrivileged().enterWriteAccess();
+        try {
+            Module provider = mgr.create(interpProviderJar, null, false, false, false);
+            Module lang = mgr.create(langInterpJar, null, false, false, false);
+            mgr.enable(new HashSet<Module>(Arrays.asList(provider, lang)));
+            langMod = lang;
+        } finally {
+            mgr.mutexPrivileged().exitWriteAccess();
+        }
+        assertTrue(langMod instanceof SourceModule);
+        assertTrue(langMod.isEnabled());
+
+        ClassLoader loader = langMod.getClassLoader();
+        // The class is defined in memory by the interpreting runtime:
+        Class<?> c = loader.loadClass("lang.Hello"); // NOI18N
+        assertEquals("interp-v1", c.getField("ID").get(null));
+        Runnable r = (Runnable) c.getDeclaredConstructor().newInstance();
+        r.run();
+
+        // Handwritten resources are served straight from the source JAR:
+        String services = readResource(loader, "META-INF/services/java.lang.Runnable"); // NOI18N
+        assertEquals("lang.Hello", services.trim()); // NOI18N
+        assertNotNull(loader.getResource("lang/Hello.lang")); // NOI18N
+    }
+
+    /** Interpreter mode must not create any cache directory. */
+    public void testInterpreterModeWritesNoCache() throws Exception {
+        ModuleManager mgr = newManager();
+        mgr.mutexPrivileged().enterWriteAccess();
+        try {
+            Module provider = mgr.create(interpProviderJar, null, false, false, false);
+            Module lang = mgr.create(langInterpJar, null, false, false, false);
+            mgr.enable(new HashSet<Module>(Arrays.asList(provider, lang)));
+        } finally {
+            mgr.mutexPrivileged().exitWriteAccess();
+        }
+        File cache = new File(org.openide.modules.Places.getCacheDirectory(), "source-modules/org-foo-langmodi"); // NOI18N
+        assertFalse("interpreter mode must not materialize anything: " + cache, cache.isDirectory());
     }
 
     private static String findMessage(Throwable t) {
@@ -295,6 +350,167 @@ public class SourceRuntimeTest extends SetupHid {
             manifest.put("OpenIDE-Module-Requires", SourceRuntime.TOKEN_PREFIX + "dummy"); // NOI18N
         }
         manifest.put("OpenIDE-Module-Source", "dummy"); // NOI18N
+        createJar(jar, contents, manifest);
+    }
+
+    /**
+     * Builds the interpreter-mode provider module: registers a
+     * DummyInterpreterRuntime that serves classes straight from the
+     * source JAR, defining them in memory on demand.
+     */
+    private static void makeInterpreterRuntimeModule(File jar) throws Exception {
+        File src = new File(jar.getParentFile(), "irt-src/org/foo/dummyi/DummyInterpreterRuntime.java"); // NOI18N
+        writeFile(src,
+                "package org.foo.dummyi;\n" // NOI18N
+                + "import java.io.ByteArrayOutputStream;\n"
+                + "import java.io.IOException;\n"
+                + "import java.io.InputStream;\n"
+                + "import java.io.OutputStream;\n"
+                + "import java.net.URL;\n"
+                + "import java.net.URLClassLoader;\n"
+                + "import java.nio.charset.StandardCharsets;\n"
+                + "import java.util.Arrays;\n"
+                + "import java.util.List;\n"
+                + "import java.io.File;\n"
+                + "import javax.tools.FileObject;\n"
+                + "import javax.tools.ForwardingJavaFileManager;\n"
+                + "import javax.tools.JavaCompiler;\n"
+                + "import javax.tools.JavaFileManager;\n"
+                + "import javax.tools.JavaFileObject;\n"
+                + "import javax.tools.SimpleJavaFileObject;\n"
+                + "import javax.tools.StandardJavaFileManager;\n"
+                + "import javax.tools.ToolProvider;\n"
+                + "import org.netbeans.Module;\n"
+                + "import org.netbeans.SourceRuntime;\n"
+                + "public class DummyInterpreterRuntime extends SourceRuntime {\n"
+                + "  public @Override String getId() {\n"
+                + "    return \"dummyi\";\n" // NOI18N
+                + "  }\n"
+                + "  public @Override String getVersion() {\n"
+                + "    return \"v1\";\n"
+                + "  }\n"
+                + "  public @Override ClassLoader createSourceLoader(Module m, List<File> classpath, ClassLoader[] parents) throws IOException {\n"
+                + "    // Interpret: resources come from the source JAR itself;\n"
+                + "    // classes are defined in memory on demand. No disk output.\n"
+                + "    return new InterpretingLoader(m.getJarFile().toURI().toURL(),\n"
+                + "        parents.length == 0 ? null : parents[0]);\n"
+                + "  }\n"
+                + "  static final class InterpretingLoader extends URLClassLoader {\n"
+                + "    InterpretingLoader(URL jar, ClassLoader parent) {\n"
+                + "      super(new URL[] {jar}, parent);\n"
+                + "    }\n"
+                + "    protected @Override Class<?> findClass(String name) throws ClassNotFoundException {\n"
+                + "      byte[] bytes = interpret(name);\n"
+                + "      if (bytes == null) {\n"
+                + "        return super.findClass(name);\n"
+                + "      }\n"
+                + "      return defineClass(name, bytes, 0, bytes.length);\n"
+                + "    }\n"
+                + "    /** The \"language\": source of class X is stored as X.lang in the JAR. */\n"
+                + "    private byte[] interpret(String className) {\n"
+                + "      String resource = className.replace('.', '/') + \".lang\"; // NOI18N\n"
+                + "      InputStream is = getResourceAsStream(resource);\n"
+                + "      if (is == null) return null;\n"
+                + "      try {\n"
+                + "        String source = new String(is.readAllBytes(), StandardCharsets.UTF_8);\n"
+                + "        return compileInMemory(className, source);\n"
+                + "      } catch (IOException ex) {\n"
+                + "        return null;\n"
+                + "      } finally {\n"
+                + "        try { is.close(); } catch (IOException ex) {}\n"
+                + "      }\n"
+                + "    }\n"
+                + "    private static byte[] compileInMemory(String className, String source) {\n"
+                + "      JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();\n"
+                + "      if (compiler == null) return null;\n"
+                + "      JavaFileObject src = new SimpleJavaFileObject(\n"
+                + "          java.net.URI.create(\"string:///\" + className.replace('.', '/') + \".java\"), // NOI18N\n"
+                + "          JavaFileObject.Kind.SOURCE) {\n"
+                + "        public @Override CharSequence getCharContent(boolean ignore) {\n"
+                + "          return source;\n"
+                + "        }\n"
+                + "      };\n"
+                + "      ByteArrayOutputStream out = new ByteArrayOutputStream();\n"
+                + "      JavaFileObject bin = new SimpleJavaFileObject(\n"
+                + "          java.net.URI.create(\"mem:///\" + className.replace('.', '/') + \".class\"), // NOI18N\n"
+                + "          JavaFileObject.Kind.CLASS) {\n"
+                + "        public @Override OutputStream openOutputStream() {\n"
+                + "          return out;\n"
+                + "        }\n"
+                + "      };\n"
+                + "      StandardJavaFileManager std = compiler.getStandardFileManager(null, null, StandardCharsets.UTF_8);\n"
+                + "      JavaFileManager fm = new ForwardingJavaFileManager<JavaFileManager>(std) {\n"
+                + "        public @Override JavaFileObject getJavaFileForOutput(\n"
+                + "                Location location, String name, JavaFileObject.Kind kind, FileObject sibling) {\n"
+                + "          return bin;\n"
+                + "        }\n"
+                + "      };\n"
+                + "      if (!compiler.getTask(null, fm, null, null, null, Arrays.asList(src)).call()) return null;\n"
+                + "      return out.toByteArray();\n"
+                + "    }\n"
+                + "  }\n"
+                + "}\n");
+        File classes = new File(jar.getParentFile(), "irt-classes"); // NOI18N
+        classes.mkdirs();
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, StandardCharsets.UTF_8);
+        try {
+            List<String> options = Arrays.asList(
+                    "-d", classes.getPath(),
+                    "-classpath", System.getProperty("java.class.path"));
+            boolean ok = compiler.getTask(null, fileManager, null, options, null,
+                    fileManager.getJavaFileObjectsFromFiles(Collections.singletonList(src))).call();
+            assertTrue("compilation of DummyInterpreterRuntime failed", ok);
+        } finally {
+            fileManager.close();
+        }
+
+        Manifest mf = new Manifest();
+        mf.getMainAttributes().putValue("Manifest-Version", "1.0"); // NOI18N
+        mf.getMainAttributes().putValue("OpenIDE-Module", "org.foo.dummyi"); // NOI18N
+        mf.getMainAttributes().putValue("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
+        mf.getMainAttributes().putValue("OpenIDE-Module-Public-Packages", "org.foo.dummyi.*"); // NOI18N
+        mf.getMainAttributes().putValue("OpenIDE-Module-Provides", SourceRuntime.TOKEN_PREFIX + "dummyi"); // NOI18N
+        try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(jar), mf)) {
+            addJarEntry(jos, "META-INF/services/org.netbeans.SourceRuntime", // NOI18N
+                    "org.foo.dummyi.DummyInterpreterRuntime\n".getBytes(StandardCharsets.UTF_8)); // NOI18N
+            jarUpDir(jos, classes, "");
+        }
+    }
+
+    private static void jarUpDir(JarOutputStream jos, File dir, String prefix) throws IOException {
+        File[] kids = dir.listFiles();
+        if (kids == null) {
+            return;
+        }
+        for (File f : kids) {
+            String path = prefix + f.getName();
+            if (f.isDirectory()) {
+                jarUpDir(jos, f, path + "/");
+            } else {
+                addJarEntry(jos, path, readFile(f));
+            }
+        }
+    }
+
+    /** Builds an interpreted (interpreter-mode) source-only module. */
+    private static void makeInterpretedModule(File jar) throws Exception {
+        Map<String,String> contents = new LinkedHashMap<>();
+        contents.put("lang/Hello.lang", // NOI18N
+                "package lang;\n" // NOI18N
+                + "public class Hello implements Runnable {\n"
+                + "  public static final String ID = \"interp-v1\";\n" // NOI18N
+                + "  public @Override void run() {\n"
+                + "    if (!\"ok\".equals(\"ok\")) throw new IllegalStateException();\n" // NOI18N
+                + "  }\n"
+                + "}\n");
+        contents.put("META-INF/services/java.lang.Runnable", "lang.Hello\n"); // NOI18N
+        Map<String,String> manifest = new HashMap<>();
+        manifest.put("OpenIDE-Module", "org.foo.langmodi"); // NOI18N
+        manifest.put("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
+        manifest.put("OpenIDE-Module-Module-Dependencies", "org.foo.dummyi > 1.0"); // NOI18N
+        manifest.put("OpenIDE-Module-Requires", SourceRuntime.TOKEN_PREFIX + "dummyi"); // NOI18N
+        manifest.put("OpenIDE-Module-Source", "dummyi"); // NOI18N
         createJar(jar, contents, manifest);
     }
 

@@ -100,7 +100,9 @@ class SourceModule extends StandardModule {
      * Compile the module if needed, then bring up a classloader over the
      * compiled output - the same construction as
      * {@link StandardModule#classLoaderUp}, except that the compiled classes
-     * directory replaces the (source) module JAR.
+     * directory replaces the (source) module JAR. Interpreter-mode runtimes
+     * instead supply a loader serving the module directly from source form
+     * (see {@link SourceRuntime#createSourceLoader}).
      */
     @Override
     protected void classLoaderUp(Set<Module> parents) throws IOException {
@@ -108,9 +110,6 @@ class SourceModule extends StandardModule {
             Util.err.log(Level.FINE, "classLoaderUp on source module {0} with parents {1}", new Object[] {this, parents});
         }
         runtime = resolveRuntime();
-        // Make sure we are compiled and up to date before anything looks
-        // for classes in this module.
-        compiledClasses = SourceModuleCompiler.compileIfNeeded(this, runtime, computeClasspath());
 
         // Find classloaders for dependent modules and parent to them.
         List<ClassLoader> loaders = new ArrayList<>(parents.size() + 1);
@@ -144,6 +143,20 @@ class SourceModule extends StandardModule {
             }
             loaders.add(l);
         }
+
+        // Interpreter mode: the runtime serves classes and resources from
+        // source form; nothing is materialized or cached.
+        ClassLoader sourceLoader = runtime.createSourceLoader(
+                this, computeClasspath(), loaders.toArray(new ClassLoader[0]));
+        if (sourceLoader != null) {
+            Util.err.log(Level.FINE, "source module {0} interpreted by {1}", new Object[] {this, runtime.getId()});
+            classloader = new RuntimeModuleClassLoader(sourceLoader, loaders.toArray(new ClassLoader[0]));
+            return;
+        }
+
+        // Bytecode mode: make sure we are compiled and up to date before
+        // anything looks for classes in this module.
+        compiledClasses = SourceModuleCompiler.compileIfNeeded(this, runtime, computeClasspath());
 
         // Patches first, then the freshly compiled classes, then any
         // Class-Path extension JARs (resolved relative to the source JAR,
@@ -286,6 +299,86 @@ class SourceModule extends StandardModule {
         String s = "SourceModule:" + getCodeNameBase() + " jarFile: " + getJarFile(); // NOI18N
         if (!isValid()) s += "[invalid]"; // NOI18N
         return s;
+    }
+
+    /**
+     * Class loader for interpreter-mode source modules: a standard
+     * multi-parented module classloader (package coverage, resource
+     * delegation policy, permissions, module identity) whose "own"
+     * classes and resources come from the runtime's loader, which serves
+     * them directly from source form.
+     */
+    private final class RuntimeModuleClassLoader extends ProxyClassLoader implements Util.ModuleProvider {
+
+        private final ClassLoader delegate;
+
+        RuntimeModuleClassLoader(ClassLoader delegate, ClassLoader[] parents) {
+            super(parents, false);
+            this.delegate = delegate;
+            addCoveredPackages(packagesOfSourceJar());
+        }
+
+        public @Override Module getModule() {
+            return SourceModule.this;
+        }
+
+        /** Serves classes from the source form via the runtime. */
+        protected @Override Class<?> doLoadClass(String pkg, String name) {
+            try {
+                return delegate.loadClass(name);
+            } catch (ClassNotFoundException ex) {
+                return null;
+            }
+        }
+
+        public @Override java.net.URL findResource(String name) {
+            return delegate.getResource(name);
+        }
+
+        public @Override java.util.Enumeration<java.net.URL> findResources(String name) throws IOException {
+            return delegate.getResources(name);
+        }
+
+        protected @Override boolean shouldDelegateResource(String pkg, ClassLoader parent) {
+            if (!super.shouldDelegateResource(pkg, parent)) {
+                return false;
+            }
+            Module other;
+            if (parent instanceof Util.ModuleProvider mp) {
+                other = mp.getModule();
+            } else {
+                other = null;
+            }
+            return getManager().shouldDelegateResource(SourceModule.this, other, pkg, parent);
+        }
+
+        public @Override String toString() {
+            return "RuntimeModuleCL@" + Integer.toHexString(System.identityHashCode(this)) // NOI18N
+                    + "[" + getCodeNameBase() + "/" + runtime.getId() + "]"; // NOI18N
+        }
+    }
+
+    /** Packages present in the module's source JAR, for classloader coverage. */
+    private Set<String> packagesOfSourceJar() {
+        Set<String> pkgs = new HashSet<>();
+        try (java.util.jar.JarFile jf = new java.util.jar.JarFile(getJarFile())) {
+            java.util.Enumeration<java.util.jar.JarEntry> en = jf.entries();
+            while (en.hasMoreElements()) {
+                String n = en.nextElement().getName();
+                if (n.endsWith("/") || n.equals("META-INF/MANIFEST.MF")) { // NOI18N
+                    continue;
+                }
+                int slash = n.lastIndexOf('/');
+                if (slash > 0) {
+                    // e.g. lang/Hello.lang -> lang,
+                    //      META-INF/services/java.lang.Runnable -> META-INF.services
+                    pkgs.add(n.substring(0, slash).replace('/', '.'));
+                }
+            }
+        } catch (IOException ex) {
+            Util.err.log(java.util.logging.Level.WARNING, "Cannot enumerate packages of " + getJarFile(), ex);
+        }
+        return pkgs;
     }
 
 }

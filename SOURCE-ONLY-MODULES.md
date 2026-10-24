@@ -224,8 +224,11 @@ public abstract class SourceRuntime {
     public final String getToken() { return TOKEN_PREFIX + getId(); }
     /** Version string included in the staleness stamp (e.g. compiler version). */
     public abstract String getVersion();
-    /** Build the extracted sources into the (empty) output directory. */
-    public abstract void build(File srcDir, File outputDir, List<File> classpath) throws IOException;
+    /** Interpreter mode: serve classes/resources from source form; nothing
+        is materialized or cached. Default: null (bytecode mode). */
+    public ClassLoader createSourceLoader(Module m, List<File> classpath, ClassLoader[] parents) { return null; }
+    /** Bytecode mode: build loadable output into the (empty) directory. */
+    public void build(File srcDir, File outputDir, List<File> classpath) throws IOException { ... }
     /** Finds a runtime: "true"/"java" -> built-in; otherwise enabled token providers. */
     public static SourceRuntime find(ModuleManager mgr, String id) throws IOException;
 }
@@ -243,33 +246,48 @@ an instructive error otherwise), which makes the existing dependency
 resolver enable the runtime before its source modules - the
 chicken-and-egg solved with zero new ordering concepts.
 
-The build contract is deliberately simple: `build()` receives the
-extracted source tree and an empty output directory and produces whatever
-the module classloader should load - class files and resources in the
-ordinary module JAR layout. The output does **not** need to be a JAR; a
-bytecode directory already works (that is exactly what the Java path
-loads). Everything else is language-agnostic and handled by the driver
-(`SourceModuleCompiler`): manifest and dependency semantics, staleness
-stamping (source digest + classpath signatures + `getVersion()`),
-extraction, patches, classloader construction and failure reporting
-through module problems. A dynamic-language runtime can emit
-`META-INF/generated-layer.xml` and `META-INF/services/*` during the build
-(or bridge the language's own registration idioms to the layer), so a
-Clojure module can register actions and lookups just like a Java one.
+Two integration modes exist; a runtime picks one:
 
-This is covered by unit tests with a simulated non-Java language
-(`SourceRuntimeTest`): a provider module registers a `DummyRuntime`
-through the token/service mechanism, a source module with
-`OpenIDE-Module-Source: dummy` is materialized by it, a runtime version
-change invalidates the cache, and misconfigured modules (missing token
-requirement, token provided but no runtime registered) get instructive
-errors.
+* **Interpreter mode** (the purest form): `createSourceLoader` returns a
+  loader that serves the module's classes and resources directly from
+  source form - interpreting, or compiling in memory. Nothing is
+  materialized, nothing is cached: the module JAR of plain source code is
+  the entire deployment artifact. The module system wraps the returned
+  loader with the full module classloader semantics
+  (`RuntimeModuleClassLoader`: parent modules, package coverage, resource
+  delegation, module identity), so implementors only handle their
+  language. Bytecode is not required at all - it is merely an
+  optimization available to runtimes that want caching.
+* **Bytecode mode**: `build` produces class files and resources in an
+  output directory, loaded by the ordinary module classloader. This buys
+  a compile-once cache and staleness-based recompilation.
 
-Remaining follow-ups: a real non-JVM runtime (Clojure is the natural first
-candidate - AOT compilation to a bytecode directory fits the contract
-unchanged), and an optional classloader-takeover extension of the SPI for
-in-memory compilers such as JRuby's, or interpreters that never produce
-files.
+Everything else is language-agnostic and handled by the module system:
+manifest and dependency semantics, staleness stamping (source digest +
+classpath signatures + `getVersion()`), extraction (bytecode mode),
+patches, failure reporting through module problems. A runtime can emit
+`META-INF/generated-layer.xml` and `META-INF/services/*` during its build
+or serve handwritten ones from the source JAR (interpreter mode), so a
+Clojure or Groovy module can register actions and lookups just like a
+Java one.
+
+This is covered by unit tests with simulated languages
+(`SourceRuntimeTest`): a bytecode-mode runtime registered through the
+token/service mechanism (materialization, version-change cache
+invalidation, misconfiguration errors) and an **interpreter-mode**
+runtime whose loader serves classes from the source JAR by compiling them
+in memory on demand - with handwritten service registrations read
+straight from source form and no cache directory created at all.
+
+Known limitation: interpreter-mode modules are visible to their
+dependents at runtime (classloader parents, as usual) but not at *compile
+time* - a bytecode runtime cannot compile against classes that only
+exist in memory. Dependents of interpreted modules should themselves be
+interpreted, or the runtime should materialize output.
+
+Remaining follow-up: a real non-JVM runtime. With interpreter mode in
+place the field is wide open: Clojure (AOT bytecode, cached) or a
+scripting language served straight from source both fit the contract.
 
 ## Pointers
 

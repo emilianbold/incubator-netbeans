@@ -49,13 +49,22 @@ import java.util.List;
  * {@code META-INF/services/org.netbeans.SourceRuntime} (the implementation
  * should live in a public package of the provider module).
  * <p>
- * The build contract: {@link #build} receives the module's extracted
- * source tree and an empty output directory, and must produce whatever
- * the module classloader should load - class files and resources in the
- * ordinary module JAR layout (a bytecode directory; a JAR is never
- * required). The module system takes care of caching, staleness
- * detection (including the runtime {@link #getVersion}), extraction,
- * classloader construction, patches and failure reporting.
+ * The module system takes care of everything language-agnostic: caching
+ * and staleness detection (including the runtime {@link #getVersion}),
+ * extraction, classloader construction with full module semantics,
+ * patches and failure reporting.
+ * <p>
+ * Two integration modes exist; a runtime picks one:
+ * <ul>
+ * <li><b>Interpreter mode</b> (the purest form): {@link #createSourceLoader}
+ *     returns a loader that serves classes and resources directly from
+ *     source form. Nothing is materialized, nothing is cached - the
+ *     module JAR of plain source code is the entire deployment artifact.
+ * <li><b>Bytecode mode</b>: {@link #build} produces class files and
+ *     resources in an output directory. This buys a compile-once cache
+ *     and staleness-based recompilation, at the cost of writing bytecode
+ *     to disk.
+ * </ul>
  *
  * @see SourceModule
  * @since org.netbeans.base/1
@@ -87,8 +96,11 @@ public abstract class SourceRuntime {
     public abstract String getVersion();
 
     /**
-     * Build the module: turn the extracted sources into something
-     * loadable in the (initially empty) output directory.
+     * Builds the module in bytecode mode: turns the extracted sources into
+     * class files and resources in the (initially empty) output directory,
+     * which the module classloader then loads - with caching and staleness
+     * detection. Only runtimes that produce loadable output on disk need
+     * to implement this.
      *
      * @param srcDir the module's source JAR contents, extracted (minus
      *        the manifest and any packaged classes)
@@ -99,7 +111,47 @@ public abstract class SourceRuntime {
      * @throws IOException on failure; the message should carry useful
      *         diagnostics - it becomes the module's problem description
      */
-    public abstract void build(File srcDir, File outputDir, List<File> classpath) throws IOException;
+    public void build(File srcDir, File outputDir, List<File> classpath) throws IOException {
+        throw new IOException(
+            "Source runtime '" + getId() + "' does not support bytecode materialization"); // NOI18N
+    }
+
+    /**
+     * Interpreter-mode runtimes override this instead of {@link #build}:
+     * provide a class loader that serves the module's classes and
+     * resources directly from source form - interpreting, or compiling in
+     * memory. Nothing is written to disk and nothing is cached; the
+     * module's JAR <em>is</em> the deployment artifact, plain source code.
+     * <p>
+     * The module system wraps the returned loader with the full module
+     * classloader semantics (parent modules, permissions, package
+     * coverage, resource delegation policy), so implementors only have to
+     * worry about their language. The loader should serve the module's
+     * resources from its source JAR ({@link Module#getJarFile}) - e.g.
+     * handwritten {@code META-INF/services} registrations and layers work
+     * unchanged - and answer {@code loadClass} for the module's own
+     * classes, compiling or interpreting them on demand.
+     * <p>
+     * The default implementation returns {@code null}, which selects
+     * bytecode mode: sources are extracted, {@link #build} is called and
+     * the produced output directory is loaded, cached and staleness-checked.
+     *
+     * @param m the module being enabled; its sources are in
+     *        {@link Module#getJarFile}
+     * @param classpath files (JARs or directories) to compile/load
+     *        against, mirroring the compile classpath the ant harness
+     *        would use
+     * @param parents the parent classloaders of the module (module
+     *        dependencies and the boot classloader), for the runtime to
+     *        compile against if it wants to
+     * @return the loader serving the module from source form, or
+     *         {@code null} to select bytecode mode
+     * @throws IOException on failure; the message becomes the module's
+     *         problem description
+     */
+    public ClassLoader createSourceLoader(Module m, List<File> classpath, ClassLoader[] parents) throws IOException {
+        return null;
+    }
 
     /**
      * Finds the source runtime for the given manifest header value.
