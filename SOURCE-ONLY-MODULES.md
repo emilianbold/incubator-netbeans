@@ -197,6 +197,68 @@ Suggested stages:
   once (cached afterwards). Parallel compilation and a shared system-wide
   precompiled cache are natural follow-ups.
 
+## Generalization: source runtimes for other languages
+
+Nothing in the design is Java-specific: the module system only needs
+*somebody* to turn a module's source form into something loadable, plus
+the usual manifest/dependencies/layers. The `OpenIDE-Module-Source` header
+can therefore carry the id of the **source runtime** responsible for the
+module:
+
+    OpenIDE-Module-Source: true        # Java, built into the Platform (as shipped today)
+    OpenIDE-Module-Source: java        # ditto, explicit
+    OpenIDE-Module-Source: clojure     # a registered SourceRuntime with id "clojure" is required
+
+An SPI in `o.n.bootstrap` (same pattern as `NetigsoFramework`: abstract
+base in the bootstrap, implementation in a regular module, bound lazily):
+
+```java
+public abstract class SourceRuntime {
+    /** Identity, e.g. "java", "clojure", "jruby". */
+    public abstract String getId();
+    /** Token the provider module must declare in OpenIDE-Module-Provides. */
+    public final String getToken() { return "org.netbeans.modules.source.runtime/" + getId(); }
+    /** Version string included in the staleness stamp (e.g. compiler version). */
+    public abstract String getVersion();
+    /** Turn the module's sources into something loadable. */
+    public abstract Materialized materialize(Module m, File cacheDir, List<File> classpath) throws IOException;
+    /** Or take over classloading entirely (defaults to a loader over the materialized output). */
+    public ClassLoader createClassLoader(Module m, Materialized output, List<ClassLoader> parents) { ... }
+}
+```
+
+`Materialized` is either a directory of bytecode/resources (loaded with
+the existing `JarClassLoader`, exactly like the Java path), or a marker
+telling the module system to use the runtime's own classloader (for
+in-memory compilers such as JRuby's, or interpreters that never produce
+files). The materialized form does **not** need to be a JAR - a cache
+directory already works; a runtime may generate one only if it wants to.
+
+Resolution and enablement order come for free from the existing dependency
+system: the header value implies a token requirement
+(`OpenIDE-Module-Requires: org.netbeans.modules.source.runtime/clojure`),
+and runtime provider modules declare the matching `OpenIDE-Module-Provides`
+token. The resolver then always enables the runtime before its source
+modules, with no new ordering concepts. The Java runtime is the one
+special case: it is built into the Platform and registered by
+`ModuleFactory` directly (it needs nothing but the JDK and the bootstrap
+itself), so plain `true` needs no provider module.
+
+Everything else is language-agnostic already: manifest and dependency
+semantics, staleness stamping (source digest + classpath signatures +
+`getVersion()`), patches, failure reporting through module problems, and
+layer/service registration - a dynamic-language runtime can emit
+`META-INF/generated-layer.xml` and `META-INF/services/*` during
+materialization (or bridge the language's own registration idioms to the
+layer), so a Clojure module can register actions and lookups just like a
+Java one.
+
+Follow-up work for this direction: extract the Java path in
+`SourceModuleCompiler` behind the `SourceRuntime` SPI, add the
+registry/token wiring in `ModuleManager`, and prototype one non-JVM
+runtime (Clojure is the natural first candidate: AOT compilation to a
+bytecode directory fits `Materialized` unchanged).
+
 ## Pointers
 
 * Runtime: `platform/o.n.bootstrap/src/org/netbeans/SourceModule.java`,
