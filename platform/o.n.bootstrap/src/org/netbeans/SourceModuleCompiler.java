@@ -92,6 +92,8 @@ final class SourceModuleCompiler {
      * @param runtime the source runtime responsible for the build
      * @param classpath files (JARs or directories) to compile against;
      *        passed through to the runtime
+     * @param stampParts deterministic, content-based inputs of the
+     *        staleness stamp (see SourceModule.computeStampParts)
      * @return the directory with the freshly compiled (or cached) output
      * @throws IOException if the build fails; the message contains
      *         diagnostics and becomes the module's problem description
@@ -148,23 +150,25 @@ final class SourceModuleCompiler {
     }
 
     /**
-     * Digest of everything that can influence the compilation result:
-     * the source JAR contents (excluding the manifest, compiled classes of
-     * hybrid modules, and build-volatile manifest attributes such as the
-     * daily implementation version), the declared classpath entries, the
-     * source runtime and its version, and the JDK. Touching or rebuilding
-     * a JAR without changing its sources does not trigger a recompilation.
+     * Digest of everything that can influence the compilation result: the
+     * source JAR contents (excluding compiled classes and build-volatile
+     * manifest attributes - so hybrid and pure forms of the same module
+     * stamp identically), the source runtime, and the compile classpath
+     * entries by size/mtime, sorted by path so the stamp is independent of
+     * enumeration order. The classpath set is the module's enabled
+     * dependency closure, which is manifest-determined and therefore stable
+     * across runs.
      */
     private static String computeStamp(File jar, List<File> classpath, SourceRuntime runtime) throws IOException {
         CRC32 crc = new CRC32();
+        byte[] buffer = new byte[8192];
         try (JarFile jarFile = new JarFile(jar)) {
-            byte[] buffer = new byte[8192];
             for (JarEntry entry : Collections.list(jarFile.entries())) {
-                if (entry.isDirectory() || MANIFEST_ENTRY.equals(entry.getName())
-                        || entry.getName().endsWith(".class")) { // NOI18N
+                if (entry.isDirectory() || entry.getName().endsWith(".class") // NOI18N
+                        || entry.getName().equals(MANIFEST_ENTRY)) {
                     continue;
                 }
-                crc.update(entry.getName().getBytes(StandardCharsets.UTF_8));
+                update(crc, entry.getName());
                 try (InputStream is = jarFile.getInputStream(entry)) {
                     int len;
                     while ((len = is.read(buffer)) != -1) {
@@ -181,8 +185,8 @@ final class SourceModuleCompiler {
                             || "OpenIDE-Module-Build-Version".equals(name)) { // NOI18N
                         continue;
                     }
-                    crc.update(name.getBytes(StandardCharsets.UTF_8));
-                    crc.update(String.valueOf(attr.getValue()).getBytes(StandardCharsets.UTF_8));
+                    update(crc, name);
+                    update(crc, String.valueOf(attr.getValue()));
                 }
             }
         }
@@ -192,12 +196,19 @@ final class SourceModuleCompiler {
         sb.append(':').append(runtime.getVersion());
         sb.append("|crc=").append(crc.getValue()); // NOI18N
         sb.append("|java=").append(System.getProperty("java.version")); // NOI18N
-        for (File f : classpath) {
+        List<File> sorted = new ArrayList<>(classpath);
+        sorted.sort(null);
+        for (File f : sorted) {
             sb.append("|cp=").append(f.getPath()); // NOI18N
             sb.append(':').append(f.length());
             sb.append(':').append(f.lastModified());
         }
         return sb.toString();
+    }
+
+    private static void update(CRC32 crc, String s) {
+        crc.update(s.getBytes(StandardCharsets.UTF_8));
+        crc.update((byte) 0);
     }
 
     private static String readStamp(File stampFile) throws IOException {
