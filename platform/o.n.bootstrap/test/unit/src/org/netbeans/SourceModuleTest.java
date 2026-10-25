@@ -145,6 +145,7 @@ public class SourceModuleTest extends SetupHid {
                 + "  <file name=\"shipped-marker.instance\"/>\n" // NOI18N
                 + "</filesystem>\n");
         contents.put("META-INF/generated-layer.hint", "layer=true"); // NOI18N
+        contents.put("META-INF/services/java.lang.Runnable", "org.foo.srcmod.Src\n"); // NOI18N
         Map<String,String> manifest = new HashMap<>();
         manifest.put("OpenIDE-Module", "org.foo.shippedlayer"); // NOI18N
         manifest.put("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
@@ -160,12 +161,15 @@ public class SourceModuleTest extends SetupHid {
             // The layer is served straight from the JAR...
             String layer = readResource(m.getClassLoader(), "META-INF/generated-layer.xml"); // NOI18N
             assertTrue(layer.contains("shipped-marker")); // NOI18N
+            // ...and so are generated service registrations...
+            String services = readResource(m.getClassLoader(), "META-INF/services/java.lang.Runnable"); // NOI18N
+            assertEquals("org.foo.srcmod.Src", services.trim()); // NOI18N
             // ...without compiling the module:
             File cache = new File(org.openide.modules.Places.getCacheDirectory(),
                     "source-modules/org-foo-shippedlayer"); // NOI18N
-            assertFalse("layer lookup must not compile a module that ships its layer", // NOI18N
+            assertFalse("generated-resource lookups must not compile a module that ships them", // NOI18N
                     cache.isDirectory());
-            // The first class load still compiles (and regenerates the layer):
+            // The first class load still compiles:
             Class<?> c = m.getClassLoader().loadClass("org.foo.srcmod.Src"); // NOI18N
             assertEquals("shipped", c.getField("ID").get(null));
         } finally {
@@ -502,6 +506,11 @@ public class SourceModuleTest extends SetupHid {
                 + "  }\n"
                 + "}\n");
         contents.put("org/foo/srcmod/Bundle.properties", // NOI18N
+                "msg_hand=HandValue\n"); // NOI18N
+        // The harness ships the handwritten bundle under the side path for
+        // the runtime compile's source tree, and the merged copy at the
+        // plain path for pre-compile serving:
+        contents.put("META-INF/netbeans/source-bundles/org/foo/srcmod/Bundle.properties", // NOI18N
                 "msg_hand=HandValue\n"); // NOI18N
         contents.put("org/foo/srcmod/resource.txt", // NOI18N
                 "some resource\n"); // NOI18N

@@ -340,6 +340,15 @@
          at build time, so their hint is conservatively "unknown". -->
     <target name="-source-module-hints" if="source.module.pack" depends="init">
         <mkdir dir="${build.dir}/source-hints/META-INF"/>
+        <!-- Also carry the ORIGINAL handwritten bundles under a side path:
+             the runtime compile needs them as source-path input (bundle
+             merging and layer verification read them there, exactly like
+             the ant build), while the merged bundles shipped at their
+             plain paths are only served pre-compile. -->
+        <mkdir dir="${build.dir}/source-bundles/META-INF/netbeans/source-bundles"/>
+        <copy todir="${build.dir}/source-bundles/META-INF/netbeans/source-bundles">
+            <fileset dir="${src.dir}" includes="**/Bundle.properties"/>
+        </copy>
         <condition property="source.module.layer.hint" value="layer=true">
             <and>
                 <isfalse value="${source.module.pure}"/>
@@ -364,26 +373,20 @@
         </jarwithmoduleattributes>
     </target>
     <target name="-do-jar-source-hybrid" depends="init,compile,jar-prep,-pre-jar,-source-module-hints" if="source.module.hybrid.pack" unless="is.jar.uptodate">
-        <!-- Hybrid source module: compiled classes as usual (so that binary
-             dependents keep building) plus the complete source tree. At
-             runtime the module system compiles from the sources and ignores
-             the packaged classes. Regenerable artifacts whose presence would
-             collide with the annotation processors at the runtime self-compile
-             (generated service registrations, merged Bundle.properties) are
-             NOT packaged - the runtime compile regenerates them. The generated
-             layer IS packaged: it is eagerly queried at module load, so
-             serving the build-time copy lets the module defer compilation
-             until its classes are first needed (the runtime never feeds the
-             shipped copy into its own compile). -->
+        <!-- Hybrid source module: the full build output (classes, resources,
+             and generated artifacts: layer, service registrations, merged
+             bundles, processor registrations) plus the complete source tree.
+             The runtime serves the generated artifacts straight from the JAR
+             (they are derived from the same sources it will compile, and the
+             staleness stamp invalidates them together), deferring compilation
+             until the module's classes are first needed; its own runtime
+             compile never sees the shipped copies (extractSources skips the
+             generated namespace) and regenerates authoritative ones. -->
         <jarwithmoduleattributes jarfile="${cluster}/${module.jar}" compress="${build.package.compress}" index="${build.package.index}" manifest="${manifest.mf}" stamp="${cluster}/.lastModified">
-            <fileset dir="${build.classes.dir}">
-                <exclude name="META-INF/services/**"/>
-                <exclude name="META-INF/namedservices/**"/>
-                <exclude name="META-INF/namedservices.index"/>
-                <exclude name="**/Bundle.properties"/>
-            </fileset>
-            <fileset dir="${src.dir}" includes="**/*.java,META-INF/services/**,META-INF/namedservices/**,**/Bundle.properties"/>
+            <fileset dir="${build.classes.dir}"/>
+            <fileset dir="${src.dir}" includes="**/*.java"/>
             <fileset dir="${build.dir}/source-hints"/>
+            <fileset dir="${build.dir}/source-bundles"/>
         </jarwithmoduleattributes>
     </target>
     <target name="-do-jar-binary" depends="init,compile,jar-prep,-pre-jar" if="binary.module.pack" unless="is.jar.uptodate">

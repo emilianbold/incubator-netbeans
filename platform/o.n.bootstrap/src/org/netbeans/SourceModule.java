@@ -82,7 +82,10 @@ class SourceModule extends StandardModule {
     static final String LAYER_HINT_ENTRY = "META-INF/generated-layer.hint"; // NOI18N
 
     /** The generated layer resource, looked up eagerly for every enabled module. */
-    private static final String GENERATED_LAYER = "META-INF/generated-layer.xml"; // NOI18N
+    static final String GENERATED_LAYER_ENTRY = "META-INF/generated-layer.xml"; // NOI18N
+
+    /** Side path in hybrid JARs carrying the original handwritten bundles. */
+    static final String SOURCE_BUNDLES_PREFIX = "META-INF/netbeans/source-bundles/"; // NOI18N
 
     /** Set to compile at enablement instead of first use. */
     private static final String EAGER_PROP = "netbeans.source.modules.eager"; // NOI18N
@@ -431,9 +434,29 @@ class SourceModule extends StandardModule {
     // Resource laziness support
     // ---------------------------------------------------------------------
 
-    /** Whether the resource is (or may be) produced by annotation processing. */
+    /** Whether the resource is (or may be) produced by annotation processing,
+     *  and may therefore have a build-time shipped copy worth serving while
+     *  the module is not yet compiled. */
     static boolean isGeneratedResource(String name) {
-        return name.endsWith("Bundle.properties") // NOI18N
+        return GENERATED_LAYER_ENTRY.equals(name)
+                || name.endsWith("Bundle.properties") // NOI18N
+                || name.startsWith("META-INF/services/") // NOI18N
+                || name.startsWith("META-INF/namedservices/") // NOI18N
+                || name.equals("META-INF/namedservices.index"); // NOI18N
+    }
+
+    /**
+     * Whether a hybrid JAR entry belongs to the generated namespace that must
+     * never feed the runtime self-compile: the processors either refuse to
+     * regenerate ("already exists in sources") or would merge a stale copy.
+     * Note Bundle.properties is NOT here: a handwritten bundle is a genuine
+     * source input, and merging a pre-merged copy is idempotent - so it is
+     * extracted and re-merged, and its shipped copy is only served as a
+     * pre-compile convenience.
+     */
+    static boolean isGeneratedNamespace(String name) {
+        return GENERATED_LAYER_ENTRY.equals(name)
+                || LAYER_HINT_ENTRY.equals(name)
                 || name.startsWith("META-INF/services/") // NOI18N
                 || name.startsWith("META-INF/namedservices/") // NOI18N
                 || name.equals("META-INF/namedservices.index"); // NOI18N
@@ -461,6 +484,11 @@ class SourceModule extends StandardModule {
                 while (en.hasMoreElements()) {
                     String n = en.nextElement().getName();
                     if (n.endsWith("/") || n.equals("META-INF/MANIFEST.MF") || n.endsWith(".class")) { // NOI18N
+                        continue;
+                    }
+                    if (n.startsWith(SOURCE_BUNDLES_PREFIX)) {
+                        // build metadata (handwritten bundle copies for the
+                        // runtime compile's source tree), not a resource
                         continue;
                     }
                     entries.add(n);
@@ -563,27 +591,31 @@ class SourceModule extends StandardModule {
         }
 
         public @Override URL findResource(String name) {
-            if (GENERATED_LAYER.equals(name)) {
-                // Eagerly looked up for every enabled module at startup.
-                // The build-time generated layer is shipped in the JAR:
-                // serve it directly - the module can defer compilation
-                // until its classes are first needed. (The runtime compile
-                // regenerates an identical copy; it is never fed the
-                // shipped one.) Otherwise the build-time hint lets
+            if (isGeneratedResource(name)) {
+                // Generated artifacts (the layer, service registrations,
+                // merged bundles) are shipped in hybrid JARs - derived from
+                // the same sources the runtime would compile, invalidated
+                // together with them by the staleness stamp - so serve the
+                // shipped copy while uncompiled (the layer is eagerly looked
+                // up for every enabled module at startup). Once compiled,
+                // the regenerated copies are authoritative, with the shipped
+                // copy as fallback (the compile does not regenerate
+                // handwritten registrations). Modules that ship none (pure
+                // modules) compile on first lookup, and the layer hint lets
                 // layer-less modules answer without compiling at all.
-                if (jarEntries.contains(name)) {
+                if (compiledClasses == null && jarEntries.contains(name)) {
                     return jarUrl(name);
                 }
-                if ("layer=false".equals(layerHint())) { // NOI18N
+                if (compiledClasses == null && GENERATED_LAYER_ENTRY.equals(name)
+                        && "layer=false".equals(layerHint())) { // NOI18N
                     return null;
                 }
-            }
-            if (GENERATED_LAYER.equals(name) || isGeneratedResource(name)) {
                 try {
                     ensureCompiled();
-                    return realLoader().getResource(name);
+                    URL url = realLoader().getResource(name);
+                    return url != null ? url : jarUrl(name);
                 } catch (IOException ex) {
-                    return null;
+                    return jarEntries.contains(name) ? jarUrl(name) : null;
                 }
             }
             // Present in the source JAR? Serve it verbatim - the compile
@@ -595,15 +627,16 @@ class SourceModule extends StandardModule {
         }
 
         public @Override Enumeration<URL> findResources(String name) throws IOException {
-            if (GENERATED_LAYER.equals(name)) {
+            if ((GENERATED_LAYER_ENTRY.equals(name) || isGeneratedResource(name))
+                    && compiledClasses == null) {
                 if (jarEntries.contains(name)) {
                     return java.util.Collections.enumeration(java.util.Collections.singleton(jarUrl(name)));
                 }
-                if ("layer=false".equals(layerHint())) { // NOI18N
+                if (GENERATED_LAYER_ENTRY.equals(name) && "layer=false".equals(layerHint())) { // NOI18N
                     return java.util.Collections.emptyEnumeration();
                 }
             }
-            if (GENERATED_LAYER.equals(name) || isGeneratedResource(name)) {
+            if (isGeneratedResource(name)) {
                 ensureCompiled();
                 return realLoader().getResources(name);
             }

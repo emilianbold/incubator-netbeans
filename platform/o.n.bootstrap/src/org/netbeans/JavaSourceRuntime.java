@@ -146,6 +146,9 @@ final class JavaSourceRuntime extends SourceRuntime {
                 sb.append("... (further errors suppressed)\n"); // NOI18N
                 break;
             }
+            if (d.getSource() != null) {
+                sb.append(d.getSource().getName()).append(':').append(d.getLineNumber()).append(' '); // NOI18N
+            }
             sb.append(d.getMessage(null)).append('\n');
         }
         if (count == 0) {

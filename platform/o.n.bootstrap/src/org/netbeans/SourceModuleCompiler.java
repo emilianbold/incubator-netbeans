@@ -127,7 +127,7 @@ final class SourceModuleCompiler {
         }
 
         extractSources(jar, src);
-        if (!hasFiles(src)) {
+        if (!hasFiles(src) && !hasFiles(classes)) {
             deleteRecursively(classes);
             throw new IOException("No sources found in source module " + cnb + " (" + jar + ")"); // NOI18N
         }
@@ -135,11 +135,18 @@ final class SourceModuleCompiler {
         try {
             runtime.build(src, classes, classpath);
         } catch (IOException ex) {
+            StringBuilder layout = new StringBuilder();
+            try {
+                listTree(classes, layout);
+            } catch (IOException ex2) {
+                layout.append("cannot list: ").append(ex2); // NOI18N
+            }
             deleteRecursively(classes);
             String detail = ex.getMessage();
             throw new IOException(
                 "Compilation of source module " + cnb + " failed" // NOI18N
                 + (detail != null && !detail.isEmpty() ? ":\n" + detail : "")
+                + "\n[classes tree: " + layout + "]" // NOI18N
                 + "\n[classpath: " + JavaSourceRuntime.joinPaths(classpath) + "]", ex);
         }
 
@@ -228,26 +235,26 @@ final class SourceModuleCompiler {
     }
 
     /**
-     * Extracts all JAR entries except the manifest into the given directory.
-     * Compiled classes are skipped too: hybrid modules (transition form,
-     * packaged with classes for their binary build-time dependents) carry
-     * them, but the compilation output must come from sources alone. The
-     * build-time layer hint is build metadata, and the shipped generated
-     * layer must never feed the runtime self-compile (the layer processors
-     * would merge the stale copy) - both are served as JAR resources only.
+     * Extracts all JAR entries except the manifest into the source tree.
+     * Handwritten bundles shipped under the side path are extracted to
+     * their real location (prefix stripped); the merged copies at plain
+     * paths are not extracted at all (see isSkippedAtExtraction).
      */
     private static void extractSources(File jar, File targetDir) throws IOException {
         try (JarFile jarFile = new JarFile(jar)) {
             Enumeration<JarEntry> entries = jarFile.entries();
             while (entries.hasMoreElements()) {
                 JarEntry entry = entries.nextElement();
-                if (entry.isDirectory() || MANIFEST_ENTRY.equals(entry.getName())
-                        || entry.getName().endsWith(".class") // NOI18N
-                        || entry.getName().equals("META-INF/generated-layer.hint") // NOI18N
-                        || entry.getName().equals("META-INF/generated-layer.xml")) { // NOI18N
+                if (entry.isDirectory()) {
                     continue;
                 }
-                File target = new File(targetDir, entry.getName());
+                String name = entry.getName();
+                if (name.startsWith(SourceModule.SOURCE_BUNDLES_PREFIX)) {
+                    name = name.substring(SourceModule.SOURCE_BUNDLES_PREFIX.length());
+                } else if (isSkippedAtExtraction(name)) {
+                    continue;
+                }
+                File target = new File(targetDir, name);
                 File parent = target.getParentFile();
                 if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
                     throw new IOException("Cannot create " + parent); // NOI18N
@@ -261,6 +268,41 @@ final class SourceModuleCompiler {
                      OutputStream os = new FileOutputStream(target)) {
                     copyStream(is, os);
                 }
+            }
+        }
+    }
+
+    /** Entries of a hybrid JAR that must not be extracted into the runtime
+     *  compilation's source tree: compiled classes, the manifest, the
+     *  generated namespace, and the merged Bundle.properties at their plain
+     *  paths (shipped for pre-compile serving only). The bundled handwritten
+     *  copies under {@link SourceModule#SOURCE_BUNDLES_PREFIX} ARE extracted -
+     *  into the source tree, where the processors read them exactly like the
+     *  ant build's src/ (reading the merged copies from the output location
+     *  instead would collide with the processors' own writes there: javac's
+     *  Filer forbids reopening files it has written).
+     */
+    static boolean isSkippedAtExtraction(String name) {
+        return MANIFEST_ENTRY.equals(name) // NOI18N
+                || name.endsWith(".class") // NOI18N
+                || name.endsWith("Bundle.properties") // NOI18N
+                || SourceModule.isGeneratedNamespace(name);
+    }
+
+    /** Debug helper: lists the files under a directory into a StringBuilder. */
+    private static void listTree(File dir, StringBuilder sb) throws IOException {
+        File[] kids = dir.listFiles();
+        if (kids == null) {
+            return;
+        }
+        for (File f : kids) {
+            if (sb.length() > 4000) {
+                return;
+            }
+            if (f.isDirectory()) {
+                listTree(f, sb);
+            } else {
+                sb.append(f.getName()).append(' ');
             }
         }
     }
