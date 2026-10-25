@@ -179,15 +179,17 @@ Modules that need extra care or should stay binary:
   ...) - they are loaded as fixed modules from the startup classloader,
   before the module system exists; and the whole platform compiles and
   processes annotations against them.
-* **Annotation-processor providers** (`openide.util.lookup`,
-  `api.annotations.common`, `openide.awt`, `openide.filesystems`,
-  `settings`, `editor.mimelookup`, ...) must stay **binary**: their
-  generated `META-INF/services/javax.annotation.processing.Processor`
-  registrations have to remain in their JARs so that other modules' *build
-  time* annotation processing keeps working. (Their runtime compiled output
-  could serve as the processor path for dependent *source* modules, which
-  would make even these convertible - but only together with all their
-  users, and they are load-bearing for every compile: convert them last.)
+* **Annotation-processor providers** - the 13 platform ones
+  (`openide.awt`, `openide.windows`, `openide.nodes`, `openide.loaders`,
+  `settings`, `options.api`, `editor.mimelookup`, ...) are now
+  **source-only** via the ship-and-skip treatment: their generated
+  processor registration ships in the hybrid JAR (build-time dependents
+  keep discovering it), is skipped at the runtime self-compile, and is
+  regenerated into the compiled output for dependent source modules.
+  Providers in the ide cluster follow the same way once those clusters
+  convert. (`org.openide.util.lookup` itself is in the bootstrap core and
+  stays binary - it is the seed that regenerates everyone else's
+  registrations.)
 * **Modules with native libraries / pre-built binaries** (`dlight.nativeexecution`,
   `keyring`, JNA wrappers, ...), **JavaHelp** modules (jhindexer builds a
   separate search index JAR), and modules with real **source preprocessing**
@@ -229,17 +231,26 @@ Suggested stages:
    from source during startup (regenerating layers and service
    registrations via the runtime annotation processors), and a warm start
    on the same userdir reuses the cache with no recompilation at all.
-2. (done, mass conversion) 133 of the 262 modules of the Platform+Java
-   clusters are now source-only (64 Platform, 69 Java) - every module with
-   a plain ant build (bare `build.xml`, no annotation-processor
-   providers, no javahelp) that does not compile against the javac APIs.
-   Three with benign custom targets are included (`o.n.swing.tabcontrol`
-   demo targets, `print`, `autoupdate.services`). Library wrappers,
-   processor providers, and the javac-API family stay binary (see below).
-   A live full-IDE start compiles the enabled source modules from source
-   with zero failures; warm starts recompile nothing.
-3. Processor providers, once their users are converted (today every one
-   of them still has users in the not-yet-converted ide/extide clusters).
+2. (done, mass conversion) 133 of the 262 Platform+Java modules converted,
+   then the 13 platform annotation-processor providers followed once the
+   ship-and-skip treatment covered their generated processor
+   registrations - platform stands at 77 of its 80 real modules (96%)
+   source-only. The permanently-binary remainder: `keyring` (native/JNA),
+   `openide.filesystems.compat8` (boot classpath), `htmlui` (JavaFX
+   platform plumbing), plus the 9-module bootstrap core. In the Java
+   cluster 69 of 140 real modules are source-only, capped by the
+   javac-API family; the ide/webcommon/javafx clusters await their
+   conversion runs (~190 immediately convertible).
+3. (done) The 13 platform processor providers - unlocked not by converting
+   users first, but by the ship-and-skip treatment: their generated
+   `META-INF/services/javax.annotation.processing.Processor` registration
+   ships in the hybrid JAR for build-time dependents, is skipped at the
+   runtime self-compile, and is regenerated into the provider's compiled
+   output where dependent source modules discover it on their processor
+   path. (The one known gap: api.annotations.common's HANDWRITTEN
+   registration is not regenerated, so its validation-only processor is
+   skipped in runtime compiles - benign.) The remaining providers in
+   ide/extide clusters follow the same way.
 4. Whole subsystems once their internal dependency subtree is fully
    converted.
 5. The small binary core that remains: bootstrap, the `openide.*` SPI

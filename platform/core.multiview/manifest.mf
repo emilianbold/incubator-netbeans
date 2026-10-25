@@ -4,4 +4,5 @@ OpenIDE-Module-Specification-Version: 1.79
 OpenIDE-Module-Localizing-Bundle: org/netbeans/core/multiview/resources/Bundle.properties
 OpenIDE-Module-Layer: org/netbeans/core/multiview/resources/mf-layer.xml
 AutoUpdate-Essential-Module: true
+OpenIDE-Module-Source: true
 
