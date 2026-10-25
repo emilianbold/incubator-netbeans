@@ -78,12 +78,17 @@ Two variants exist:
 * **Caching and staleness.** Compiled output is cached in
   `var/cache/source-modules/<code-name-base>/`. A stamp file records a
   digest of the source JAR *contents* (skipping the manifest's volatile
-  build-stamp attributes and any packaged classes of hybrid modules), the
-  size/mtime of every classpath entry, and the JDK version. Any change -
-  e.g. the user patched the JAR locally, a dependency was rebuilt, or the
-  JDK changed - invalidates the cache and triggers recompilation.
-  Recompilation is all-or-nothing: the stamp is written only after a
-  successful compile, and a failed compile leaves no partial output behind.
+  build-stamp attributes and any packaged classes - so hybrid and pure
+  forms of the same module stamp identically), and the size/mtime of
+  every compile classpath entry, *sorted by path*. The classpath set is
+  the module's *enabled* dependency closure, which is manifest-determined
+  and therefore identical on every start - disabled platform variants
+  (e.g. the foreign-OS JavaFX fragments) are never part of it. Any real
+  change - the user patched the JAR locally, a dependency was rebuilt,
+  the JDK changed - invalidates the cache and triggers recompilation;
+  identical starts reuse it completely. Recompilation is all-or-nothing:
+  the stamp is written only after a successful compile, and a failed
+  compile leaves no partial output behind.
 * **Compilation is lazy.** Module *enablement* only creates the loader; the
   build happens on first use - the first class load, or the first lookup of
   a resource the compile would generate. Resources that physically exist in
@@ -114,12 +119,11 @@ A module opts in via `nbproject/project.properties`:
     is.source.module=true
 
 plus the `OpenIDE-Module-Source: true` header in `manifest.mf`. By default
-it is then packaged in **hybrid** form: compiled classes *minus the
-regenerable artifacts* (generated service registrations, merged
-`Bundle.properties`, generated layer - these would collide with the
-annotation processors when recompiled at runtime, and are regenerated
-anyway), plus the source tree and any handwritten registrations/bundles.
-The runtime ignores all packaged classes and always compiles from source.
+it is then packaged in **hybrid** form: compiled classes (as before, so
+the public-package-jars distillation and every binary dependent keep
+working unchanged) plus the source tree. The runtime ignores all packaged
+classes and always compiles from source.
+
 Once no binary module depends on this one anymore - it is a leaf of the
 module dependency graph, or all of its dependents have been converted - it
 can switch to pure form:
@@ -129,6 +133,16 @@ can switch to pure form:
 which skips compilation entirely at build time and packages only sources +
 resources. `source.module.compile=true` forces build-time compilation for
 verification even in pure mode (classes are never packaged in pure mode).
+
+For whole-distribution packaging there is also a post-build step
+(`ant trim-source-modules`) that strips the classes from every source
+module JAR of the built clusters, converting the hybrid form to pure in
+place after all dependents have been built - the classes exist exactly as
+long as the build needs them. Users only ever see the trimmed,
+source-only JAR. (The trim rewrites the JARs, which changes their
+mtime/length and therefore invalidates developer caches once - a
+developer-only transition cost; the shipped artifact starts fresh
+anyway.)
 
 Cluster builds need no ordering changes: pure modules compile nothing at
 build time, and every runtime dependency (binary or source) is present in
