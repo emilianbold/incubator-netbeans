@@ -350,6 +350,13 @@ class SourceModule extends StandardModule {
                 // Unsatisfied dependency - reported elsewhere with a proper error.
                 continue;
             }
+            // Only enabled modules contribute: the enabled dependency
+            // closure is manifest-determined and therefore stable across
+            // runs (disabled platform variants must not leak into the
+            // compile classpath, or the cache stamp would churn).
+            if (!parent.isEnabled()) {
+                continue;
+            }
             if (parent instanceof SourceModule) {
                 // A source module: compile against its compiled output
                 // (compiling it first if needed - laziness propagates),
@@ -384,15 +391,19 @@ class SourceModule extends StandardModule {
             if (fragmentHost != null) {
                 String hostName = (String) Util.parseCodeName(fragmentHost)[0];
                 Module host = getManager().get(hostName);
-                if (host != null && visited.add(hostName)) {
+                if (host != null && host.isEnabled() && visited.add(hostName)) {
                     cp.addAll(host.getAllJars());
                     collectDependencyJars(host, cp, visited);
                 }
             }
             // Conversely, a host's classloader merges its fragments' JARs
             // (including their Class-Path extensions), e.g. the nb-javac
-            // API jars attached to libs.javacapi.
+            // API jars attached to libs.javacapi - but only the fragments
+            // that are actually enabled (platform variants!).
             for (Module frag : getManager().getAttachedFragments(parent)) {
+                if (!frag.isEnabled()) {
+                    continue;
+                }
                 if (visited.add(frag.getCodeNameBase())) {
                     cp.addAll(frag.getAllJars());
                     collectDependencyJars(frag, cp, visited);
@@ -459,6 +470,20 @@ class SourceModule extends StandardModule {
                     }
                 }
             }
+            // Class-Path extension JARs (and patches) are static knowledge:
+            // cover their packages right away, so reference resolution from
+            // dependent modules routes here (triggering the lazy compile)
+            // instead of falling through to the system classloader.
+            for (File f : getAllJars()) {
+                if (f.equals(getJarFile())) {
+                    continue;
+                }
+                if (f.isDirectory()) {
+                    collectPackages(f, "", packages);
+                } else {
+                    collectJarPackages(f, packages);
+                }
+            }
             // Service registrations do not exist in the source JAR (they are
             // generated), but lookups for them must route here to trigger
             // the lazy compile; the compiled output adds exact coverage for
@@ -466,7 +491,28 @@ class SourceModule extends StandardModule {
             packages.add("META-INF.services"); // NOI18N
             packages.add("META-INF.namedservices"); // NOI18N
             jarEntries = entries;
+            Util.err.log(Level.FINE, "lazy loader {0} covering packages {1}", new Object[] {getCodeNameBase(), packages});
             addCoveredPackages(packages);
+        }
+
+        /** Packages of a JAR's contents - class files included, since a
+         *  library JAR typically contains nothing else. */
+        private static void collectJarPackages(File jar, Set<String> out) {
+            try (JarFile jf = new JarFile(jar)) {
+                Enumeration<JarEntry> en = jf.entries();
+                while (en.hasMoreElements()) {
+                    String n = en.nextElement().getName();
+                    if (n.endsWith("/")) { // NOI18N
+                        continue;
+                    }
+                    int slash = n.lastIndexOf('/');
+                    if (slash > 0) {
+                        out.add(n.substring(0, slash).replace('/', '.'));
+                    }
+                }
+            } catch (IOException ex) {
+                Util.err.log(Level.FINE, "Cannot enumerate packages of {0}", jar); // NOI18N
+            }
         }
 
         /** Extends coverage with the packages of the compiled output and
@@ -478,21 +524,7 @@ class SourceModule extends StandardModule {
                 if (f.isDirectory()) {
                     collectPackages(f, "", packages);
                 } else if (f.isFile() && f.getName().endsWith(".jar")) { // NOI18N
-                    try (JarFile jf = new JarFile(f)) {
-                        Enumeration<JarEntry> en = jf.entries();
-                        while (en.hasMoreElements()) {
-                            String n = en.nextElement().getName();
-                            if (n.endsWith("/") || n.endsWith(".class")) { // NOI18N
-                                continue;
-                            }
-                            int slash = n.lastIndexOf('/');
-                            if (slash > 0) {
-                                packages.add(n.substring(0, slash).replace('/', '.'));
-                            }
-                        }
-                    } catch (IOException ex) {
-                        Util.err.log(Level.FINE, "Cannot enumerate packages of {0}", f); // NOI18N
-                    }
+                    collectJarPackages(f, packages);
                 }
             }
             addCoveredPackages(packages);

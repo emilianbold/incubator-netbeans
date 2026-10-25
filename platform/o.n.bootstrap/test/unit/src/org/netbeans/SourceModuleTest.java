@@ -126,6 +126,95 @@ public class SourceModuleTest extends SetupHid {
         assertTrue(cacheMarker().isFile());
     }
 
+    /**
+     * The jna/flatlaf pattern: a source module wraps a library in a
+     * Class-Path ext JAR; a binary dependent's classes reference the
+     * library package. Resolution must route through the source module's
+     * lazy loader (compiling it if needed), not fall through to the
+     * system classloader - both before and after the source module is
+     * compiled.
+     */
+    public void testExtJarResolutionFromBinaryDependent() throws Exception {
+        // Build the library JAR: com/foo/ext/Ext.class
+        File libSrc = new File(getWorkDir(), "ext-src/com/foo/ext/Ext.java"); // NOI18N
+        writeFile(libSrc,
+                "package com.foo.ext;\n" // NOI18N
+                + "public final class Ext {\n"
+                + "  public static String id() { return \"ext-lib\"; }\n" // NOI18N
+                + "}\n");
+        File libClasses = new File(getWorkDir(), "ext-classes"); // NOI18N
+        libClasses.mkdirs();
+        compileFiles(Collections.singletonList(libSrc), libClasses, Collections.<String>emptyList());
+        File libJar = new File(jars, "ext/dep.jar"); // NOI18N
+        libJar.getParentFile().mkdirs();
+        try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(libJar))) {
+            addJarEntry(jos, "com/foo/ext/Ext.class", // NOI18N
+                    new File(libClasses, "com/foo/ext/Ext.class")); // NOI18N
+        }
+
+        // A source module wrapping the library via Class-Path:
+        File wrapJar = new File(jars, "wrapper-src.jar"); // NOI18N
+        Map<String,String> contents = new LinkedHashMap<>();
+        contents.put("wrap/Impl.java", // NOI18N
+                "package wrap;\n" // NOI18N
+                + "public final class Impl {\n"
+                + "  public static String use() { return com.foo.ext.Ext.id(); }\n" // NOI18N
+                + "}\n");
+        Map<String,String> wm = new HashMap<>();
+        wm.put("OpenIDE-Module", "org.foo.wrappersrc"); // NOI18N
+        wm.put("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
+        wm.put("OpenIDE-Module-Public-Packages", "wrap.*, com.foo.ext.*"); // NOI18N
+        wm.put("Class-Path", "ext/dep.jar"); // NOI18N
+        wm.put("OpenIDE-Module-Source", "true"); // NOI18N
+        createJar(wrapJar, contents, wm);
+
+        // A binary dependent whose class references the ext package:
+        File binSrc = new File(getWorkDir(), "bin-src/org/foo/bin/Client.java"); // NOI18N
+        writeFile(binSrc,
+                "package org.foo.bin;\n" // NOI18N
+                + "public final class Client {\n"
+                + "  public static String use() { return com.foo.ext.Ext.id(); }\n" // NOI18N
+                + "}\n");
+        File binClasses = new File(getWorkDir(), "bin-classes"); // NOI18N
+        binClasses.mkdirs();
+        compileFiles(Collections.singletonList(binSrc), binClasses, Collections.singletonList(libJar.getPath()));
+        File binJar = new File(jars, "client.jar"); // NOI18N
+        Manifest bmf = new Manifest();
+        bmf.getMainAttributes().putValue("Manifest-Version", "1.0"); // NOI18N
+        bmf.getMainAttributes().putValue("OpenIDE-Module", "org.foo.binclient"); // NOI18N
+        bmf.getMainAttributes().putValue("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
+        bmf.getMainAttributes().putValue("OpenIDE-Module-Module-Dependencies", "org.foo.wrappersrc > 1.0"); // NOI18N
+        try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(binJar), bmf)) {
+            addJarEntry(jos, "org/foo/bin/Client.class", // NOI18N
+                    new File(binClasses, "org/foo/bin/Client.class")); // NOI18N
+        }
+
+        // Case 1: the source module is not compiled yet (pure lazy).
+        ModuleManager mgr = newManager();
+        Module[] mods = enablePair(mgr, wrapJar, binJar);
+        Class<?> c = mods[1].getClassLoader().loadClass("org.foo.bin.Client"); // NOI18N
+        assertEquals("ext-lib", c.getMethod("use").invoke(null));
+
+        // Case 2: fresh manager, source module already compiled (flatlaf shape).
+        ModuleManager mgr2 = newManager();
+        Module[] mods2 = enablePair(mgr2, wrapJar, binJar);
+        mods2[0].getClassLoader().loadClass("wrap.Impl"); // NOI18N
+        Class<?> c2 = mods2[1].getClassLoader().loadClass("org.foo.bin.Client"); // NOI18N
+        assertEquals("ext-lib", c2.getMethod("use").invoke(null));
+    }
+
+    private Module[] enablePair(ModuleManager mgr, File jarA, File jarB) throws Exception {
+        mgr.mutexPrivileged().enterWriteAccess();
+        try {
+            Module a = mgr.create(jarA, null, false, false, false);
+            Module b = mgr.create(jarB, null, false, false, false);
+            mgr.enable(new HashSet<Module>(Arrays.asList(a, b)));
+            return new Module[] {a, b};
+        } finally {
+            mgr.mutexPrivileged().exitWriteAccess();
+        }
+    }
+
     public void testSourceModuleIsCompiledAndLoaded() throws Exception {
         ModuleManager mgr = newManager();
         Module srcMod = enableSourceModule(mgr);
