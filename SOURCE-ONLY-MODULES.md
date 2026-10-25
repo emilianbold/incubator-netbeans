@@ -119,10 +119,19 @@ A module opts in via `nbproject/project.properties`:
     is.source.module=true
 
 plus the `OpenIDE-Module-Source: true` header in `manifest.mf`. By default
-it is then packaged in **hybrid** form: compiled classes (as before, so
-the public-package-jars distillation and every binary dependent keep
-working unchanged) plus the source tree. The runtime ignores all packaged
-classes and always compiles from source.
+it is then packaged in **hybrid** form: the complete build output -
+compiled classes (as before, so the public-package-jars distillation and
+every binary dependent keep working unchanged), resources, and all
+generated artifacts (layer, service registrations, processor
+registrations, merged bundles) - plus the source tree, and the original
+handwritten bundles under a side path
+(`META-INF/netbeans/source-bundles/`). The runtime serves the shipped
+generated artifacts directly while the module is uncompiled (so
+services/bundle lookups no longer force compilation - only class loads
+do), and its self-compile takes its source-path bundle from the side
+path, exactly like an ant build: the merged copies must never feed the
+compile (the bundle processor errors on duplicate keys, and javac's
+Filer forbids re-reading a file it has just written via a processor).
 
 Once no binary module depends on this one anymore - it is a leaf of the
 module dependency graph, or all of its dependents have been converted - it
@@ -131,8 +140,10 @@ can switch to pure form:
     source.module.pure=true
 
 which skips compilation entirely at build time and packages only sources +
-resources. `source.module.compile=true` forces build-time compilation for
-verification even in pure mode (classes are never packaged in pure mode).
+resources (no generated artifacts to serve, so such modules compile on
+first lookup or class load). `source.module.compile=true` forces
+build-time compilation for verification even in pure mode (classes are
+never packaged in pure mode).
 
 For whole-distribution packaging there is also a post-build step
 (`ant trim-source-modules`) that strips the classes from every source
