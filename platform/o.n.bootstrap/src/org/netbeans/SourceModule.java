@@ -565,7 +565,15 @@ class SourceModule extends StandardModule {
         public @Override URL findResource(String name) {
             if (GENERATED_LAYER.equals(name)) {
                 // Eagerly looked up for every enabled module at startup.
-                // The build-time hint lets layer-less modules stay uncompiled.
+                // The build-time generated layer is shipped in the JAR:
+                // serve it directly - the module can defer compilation
+                // until its classes are first needed. (The runtime compile
+                // regenerates an identical copy; it is never fed the
+                // shipped one.) Otherwise the build-time hint lets
+                // layer-less modules answer without compiling at all.
+                if (jarEntries.contains(name)) {
+                    return jarUrl(name);
+                }
                 if ("layer=false".equals(layerHint())) { // NOI18N
                     return null;
                 }
@@ -587,10 +595,15 @@ class SourceModule extends StandardModule {
         }
 
         public @Override Enumeration<URL> findResources(String name) throws IOException {
-            if (GENERATED_LAYER.equals(name) || isGeneratedResource(name)) {
-                if (GENERATED_LAYER.equals(name) && "layer=false".equals(layerHint())) { // NOI18N
+            if (GENERATED_LAYER.equals(name)) {
+                if (jarEntries.contains(name)) {
+                    return java.util.Collections.enumeration(java.util.Collections.singleton(jarUrl(name)));
+                }
+                if ("layer=false".equals(layerHint())) { // NOI18N
                     return java.util.Collections.emptyEnumeration();
                 }
+            }
+            if (GENERATED_LAYER.equals(name) || isGeneratedResource(name)) {
                 ensureCompiled();
                 return realLoader().getResources(name);
             }

@@ -127,6 +127,53 @@ public class SourceModuleTest extends SetupHid {
     }
 
     /**
+     * The build-time generated layer is shipped in the JAR and served
+     * directly, so a module with a layer can answer the eager startup
+     * lookup without compiling at all - compilation waits for the first
+     * class load.
+     */
+    public void testShippedLayerServedWithoutCompiling() throws Exception {
+        Map<String,String> contents = new LinkedHashMap<>();
+        contents.put("org/foo/srcmod/Src.java", // NOI18N
+                "package org.foo.srcmod;\n" // NOI18N
+                + "public class Src {\n"
+                + "  public static final String ID = \"shipped\";\n" // NOI18N
+                + "}\n");
+        contents.put("META-INF/generated-layer.xml", // NOI18N
+                "<?xml version=\"1.0\"?>\n" // NOI18N
+                + "<filesystem>\n"
+                + "  <file name=\"shipped-marker.instance\"/>\n" // NOI18N
+                + "</filesystem>\n");
+        contents.put("META-INF/generated-layer.hint", "layer=true"); // NOI18N
+        Map<String,String> manifest = new HashMap<>();
+        manifest.put("OpenIDE-Module", "org.foo.shippedlayer"); // NOI18N
+        manifest.put("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
+        manifest.put("OpenIDE-Module-Source", "true"); // NOI18N
+        File jar = new File(jars, "shipped-layer-module.jar"); // NOI18N
+        createJar(jar, contents, manifest);
+
+        ModuleManager mgr = newManager();
+        mgr.mutexPrivileged().enterWriteAccess();
+        try {
+            Module m = mgr.create(jar, null, false, false, false);
+            mgr.enable(new HashSet<Module>(Collections.singleton(m)));
+            // The layer is served straight from the JAR...
+            String layer = readResource(m.getClassLoader(), "META-INF/generated-layer.xml"); // NOI18N
+            assertTrue(layer.contains("shipped-marker")); // NOI18N
+            // ...without compiling the module:
+            File cache = new File(org.openide.modules.Places.getCacheDirectory(),
+                    "source-modules/org-foo-shippedlayer"); // NOI18N
+            assertFalse("layer lookup must not compile a module that ships its layer", // NOI18N
+                    cache.isDirectory());
+            // The first class load still compiles (and regenerates the layer):
+            Class<?> c = m.getClassLoader().loadClass("org.foo.srcmod.Src"); // NOI18N
+            assertEquals("shipped", c.getField("ID").get(null));
+        } finally {
+            mgr.mutexPrivileged().exitWriteAccess();
+        }
+    }
+
+    /**
      * The jna/flatlaf pattern: a source module wraps a library in a
      * Class-Path ext JAR; a binary dependent's classes reference the
      * library package. Resolution must route through the source module's

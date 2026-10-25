@@ -232,7 +232,9 @@ final class SourceModuleCompiler {
      * Compiled classes are skipped too: hybrid modules (transition form,
      * packaged with classes for their binary build-time dependents) carry
      * them, but the compilation output must come from sources alone. The
-     * build-time layer hint is build metadata, not module content.
+     * build-time layer hint is build metadata, and the shipped generated
+     * layer must never feed the runtime self-compile (the layer processors
+     * would merge the stale copy) - both are served as JAR resources only.
      */
     private static void extractSources(File jar, File targetDir) throws IOException {
         try (JarFile jarFile = new JarFile(jar)) {
@@ -241,7 +243,8 @@ final class SourceModuleCompiler {
                 JarEntry entry = entries.nextElement();
                 if (entry.isDirectory() || MANIFEST_ENTRY.equals(entry.getName())
                         || entry.getName().endsWith(".class") // NOI18N
-                        || entry.getName().equals("META-INF/generated-layer.hint")) { // NOI18N
+                        || entry.getName().equals("META-INF/generated-layer.hint") // NOI18N
+                        || entry.getName().equals("META-INF/generated-layer.xml")) { // NOI18N
                     continue;
                 }
                 File target = new File(targetDir, entry.getName());

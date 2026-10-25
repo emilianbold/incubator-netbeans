@@ -367,17 +367,19 @@
         <!-- Hybrid source module: compiled classes as usual (so that binary
              dependents keep building) plus the complete source tree. At
              runtime the module system compiles from the sources and ignores
-             the packaged classes. Regenerable artifacts (generated service
-             registrations, merged Bundle.properties, generated layer) are
-             NOT packaged: the runtime compile regenerates them, and their
-             presence would collide with the annotation processors (they
-             would look like handwritten sources). -->
+             the packaged classes. Regenerable artifacts whose presence would
+             collide with the annotation processors at the runtime self-compile
+             (generated service registrations, merged Bundle.properties) are
+             NOT packaged - the runtime compile regenerates them. The generated
+             layer IS packaged: it is eagerly queried at module load, so
+             serving the build-time copy lets the module defer compilation
+             until its classes are first needed (the runtime never feeds the
+             shipped copy into its own compile). -->
         <jarwithmoduleattributes jarfile="${cluster}/${module.jar}" compress="${build.package.compress}" index="${build.package.index}" manifest="${manifest.mf}" stamp="${cluster}/.lastModified">
             <fileset dir="${build.classes.dir}">
                 <exclude name="META-INF/services/**"/>
                 <exclude name="META-INF/namedservices/**"/>
                 <exclude name="META-INF/namedservices.index"/>
-                <exclude name="META-INF/generated-layer.xml"/>
                 <exclude name="**/Bundle.properties"/>
             </fileset>
             <fileset dir="${src.dir}" includes="**/*.java,META-INF/services/**,META-INF/namedservices/**,**/Bundle.properties"/>
