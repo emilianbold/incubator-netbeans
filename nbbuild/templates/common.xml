@@ -332,13 +332,41 @@
     <extension-point name="-pre-jar" depends="init,compile,jar-prep"/>
     <extension-point name="-post-jar" depends="-pre-jar,-do-jar"/>
     <target name="jar" depends="-pre-jar,-do-jar,-post-jar"/>
+    <!-- Source modules are compiled by the JDK the IDE runs on: the runtime
+         compiler cannot honor javac.release / javac.compilerargs (they live
+         in nbproject/project.properties, which is not packaged). javac.release
+         still serves pure modules: JarWithModuleAttributes generates the
+         manifest's OpenIDE-Module-Java-Dependencies floor from it during
+         jarring, and that floor IS enforced at runtime; the bytecode-floor
+         aspect is moot because no bytecode ships. Compiler ARGUMENTS that
+         change compilation semantics would silently diverge from the ant
+         build, so the harness refuses them outright: processor options,
+         add-exports/opens/reads, explicit processor selection, proc modes,
+         XD internals, enable-preview. Werror and Xlint variants only affect
+         warnings and are allowed (the runtime compile passes -nowarn;
+         bytecode is identical). -->
+    <target name="-source-module-settings-check" if="source.module.pack" depends="init">
+        <condition property="source.module.bad.args">
+            <or>
+                <matches string="${javac.compilerargs} ${javac.add.compilerargs}" pattern="(^|\s)-A[^=\s]*="/>
+                <matches string="${javac.compilerargs} ${javac.add.compilerargs}" pattern="(^|\s)--add-(exports|opens|reads)\s"/>
+                <matches string="${javac.compilerargs} ${javac.add.compilerargs}" pattern="(^|\s)(-processor|-processorpath|-processoronly)\s"/>
+                <matches string="${javac.compilerargs} ${javac.add.compilerargs}" pattern="(^|\s)-proc:(only|full)\b"/>
+                <matches string="${javac.compilerargs} ${javac.add.compilerargs}" pattern="(^|\s)-XD"/>
+                <matches string="${javac.compilerargs} ${javac.add.compilerargs}" pattern="(^|\s)--enable-preview\b"/>
+            </or>
+        </condition>
+        <fail if="source.module.bad.args"
+              message="Module ${code.name.base} is a source module (is.source.module=true) but uses compiler arguments that the runtime compiler cannot honor (${javac.compilerargs} ${javac.add.compilerargs}). Runtime compilation would silently diverge from the ant build: remove them, or keep the module binary."/>
+    </target>
+
     <target name="-do-jar" depends="init,compile,jar-prep,-pre-jar,-do-jar-source-pure,-do-jar-source-hybrid,-do-jar-binary" unless="is.jar.uptodate"/>
     <!-- Build hint for source modules: tells the module system whether the
          annotation processors generated a layer, so that modules without
          generated layers can answer the eager startup layer lookup without
          compiling at all (lazy compilation). Pure modules are not compiled
          at build time, so their hint is conservatively "unknown". -->
-    <target name="-source-module-hints" if="source.module.pack" depends="init">
+    <target name="-source-module-hints" if="source.module.pack" depends="init,-source-module-settings-check">
         <mkdir dir="${build.dir}/source-hints/META-INF"/>
         <!-- Also carry the ORIGINAL handwritten bundles under a side path:
              the runtime compile needs them as source-path input (bundle

@@ -269,6 +269,20 @@ Suggested stages:
   threads cannot deadlock against enablement. A side effect is that two
   independent modules may compile concurrently - safe, since their cache
   directories are disjoint.
+* The runtime compiler compiles with the JDK the IDE runs on; it cannot
+  honor `javac.release` / `javac.compilerargs` (they live in
+  `nbproject/project.properties`, which is not packaged). Audited all
+  144 converted modules: none use semantics-changing arguments; the only
+  settings present are `-Xlint` variants (warnings only, bytecode
+  identical), `-Werror` (build-time quality gate, not enforced at
+  runtime) and one `javac.release=8` pin (which still generates the
+  manifest's `OpenIDE-Module-Java-Dependencies` floor during jarring -
+  the enforced runtime compatibility claim; the bytecode-floor aspect is
+  moot since no bytecode ships). The harness now refuses
+  (`-source-module-settings-check` in common.xml) to package a source
+  module whose compiler arguments would change runtime semantics:
+  `-A` processor options, `--add-exports/opens/reads`, `-processor`,
+  `-proc:` modes, `-XD` internals, `--enable-preview`.
 * Localization variant JARs (`locale/*_cs.jar`) are not handled for source
   modules yet (sources are compiled base-locale only).
 * Module unit tests (`ant test-unit`) still need binary classes - run them
