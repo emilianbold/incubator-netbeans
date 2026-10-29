@@ -25,19 +25,16 @@ import java.util.List;
 
 /**
  * A source runtime: the thing that turns a source-only module's sources
- * into something loadable. The Java runtime is built into the Platform
- * (a module with {@code OpenIDE-Module-Source: true} or {@code java}
- * needs nothing but the JDK the IDE runs on); runtimes for other source
- * languages (bytecode-producing or interpreted) are provided by regular
- * modules.
+ * into something loadable. Runtimes - including the Java one - are
+ * provided by regular modules; the module system itself is
+ * language-agnostic.
  * <p>
  * A module declares which runtime it needs with the manifest header
  *
  * <pre>OpenIDE-Module-Source: &lt;runtime id&gt;</pre>
  *
- * For any id other than {@code java} the module must also declare the
- * matching token requirement, so that the module system enables the
- * runtime provider before the module itself:
+ * and must also declare the matching token requirement, so that the
+ * module system enables the runtime provider before the module itself:
  *
  * <pre>OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.&lt;runtime id&gt;</pre>
  *
@@ -47,7 +44,9 @@ import java.util.List;
  *
  * and registers its implementation in
  * {@code META-INF/services/org.netbeans.SourceRuntime} (the implementation
- * should live in a public package of the provider module).
+ * should live in a public package of the provider module). The Java
+ * runtime ({@code id = "java"}) ships with the Platform as the
+ * {@code org.netbeans.modules.source.java} module.
  * <p>
  * The module system takes care of everything language-agnostic: caching
  * and staleness detection (including the runtime {@link #getVersion}),
@@ -94,6 +93,41 @@ public abstract class SourceRuntime {
      * changing it invalidates cached module compilations.
      */
     public abstract String getVersion();
+
+    /**
+     * Whether this runtime's build output is compatible with the module
+     * system's lazy loader: compilation is deferred to the first class
+     * load (or the first lookup of a resource the build would generate),
+     * with the resources shipped in the module JAR served in the
+     * meantime. Runtimes whose output layout the lazy loader cannot
+     * classify - or interpreter-mode runtimes, which never build -
+     * keep the default {@code false} and are materialized eagerly at
+     * enablement.
+     * <p>
+     * The Java runtime declares this: hybrid JARs ship the build-time
+     * generated artifacts (layers, service registrations, merged
+     * bundles) at their plain paths, served pre-compile, exactly like
+     * the ant build's output contract.
+     */
+    public boolean supportsLazyCompilation() {
+        return false;
+    }
+
+    /**
+     * Joins files into a classpath string, for runtimes that pass a
+     * file list to a compiler invocation ({@code -classpath} and the
+     * like).
+     */
+    public static String joinPaths(List<File> files) {
+        StringBuilder sb = new StringBuilder();
+        for (File f : files) {
+            if (sb.length() > 0) {
+                sb.append(File.pathSeparatorChar);
+            }
+            sb.append(f.getPath());
+        }
+        return sb.toString();
+    }
 
     /**
      * Builds the module in bytecode mode: turns the extracted sources into
@@ -154,12 +188,11 @@ public abstract class SourceRuntime {
     }
 
     /**
-     * Finds the source runtime for the given manifest header value.
-     * {@code null}, {@code true} and {@code java} yield the built-in Java
-     * runtime; anything else is looked up among <em>enabled</em> modules
-     * that provide the matching token and register a SourceRuntime
-     * service. Callers must ensure the runtime module is enabled first
-     * (normally by the requiring module declaring the token requirement).
+     * Finds the source runtime for the given manifest header value among
+     * <em>enabled</em> modules that provide the matching token and
+     * register a SourceRuntime service. Callers must ensure the runtime
+     * module is enabled first (normally by the requiring module declaring
+     * the token requirement).
      *
      * @param mgr the module manager to search
      * @param id the {@code OpenIDE-Module-Source} header value
@@ -168,9 +201,6 @@ public abstract class SourceRuntime {
      *         that id
      */
     public static SourceRuntime find(ModuleManager mgr, String id) throws IOException {
-        if (id == null || "true".equalsIgnoreCase(id) || "java".equals(id)) { // NOI18N
-            return JavaSourceRuntime.getDefault();
-        }
         String token = TOKEN_PREFIX + id;
         for (Module m : mgr.getModules()) {
             if (!m.isEnabled() || !m.provides(token)) {

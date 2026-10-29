@@ -4,4 +4,5 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/core/network/proxy/Bundle.propert
 OpenIDE-Module-Provides: org.netbeans.core.ProxySettings.Reloader
 OpenIDE-Module-Specification-Version: 1.47
 OpenIDE-Module-Recommends: javax.script.ScriptEngine.js
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

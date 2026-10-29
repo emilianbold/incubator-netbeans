@@ -80,7 +80,13 @@
         <!-- Support for source-only modules (compiled on demand by the module
              system at runtime, see platform/o.n.bootstrap SourceModule):
              set is.source.module=true in nbproject/project.properties and add
-             OpenIDE-Module-Source: true to manifest.mf.
+             to manifest.mf:
+               OpenIDE-Module-Source: java
+               OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
+             The Requires token makes the module system enable the Java
+             source runtime module (org.netbeans.modules.source.java) first;
+             runtimes are ordinary modules, the module system is
+             language-agnostic.
 
              By default the module is packaged in HYBRID form: compiled
              classes (as before, for build-time dependents) plus the full
@@ -358,6 +364,33 @@
         </condition>
         <fail if="source.module.bad.args"
               message="Module ${code.name.base} is a source module (is.source.module=true) but uses compiler arguments that the runtime compiler cannot honor (${javac.compilerargs} ${javac.add.compilerargs}). Runtime compilation would silently diverge from the ant build: remove them, or keep the module binary."/>
+        <!-- The manifest contract: the runtime id must be declared, and its
+             token required, so the module system enables the runtime
+             module before this one. -->
+        <condition property="source.module.runtime.id" value="java">
+            <or>
+                <equals arg1="${is.source.module}" arg2="true"/>
+                <not><isset property="is.source.module"/></not>
+            </or>
+        </condition>
+        <property name="source.module.runtime.id" value="${is.source.module}"/>
+        <loadfile property="source.module.manifest.text" srcFile="${manifest.mf}"/>
+        <condition property="source.module.bad.header">
+            <not>
+                <matches string="${source.module.manifest.text}" multiline="true"
+                         pattern="^OpenIDE-Module-Source:[ \t]*(true|${source.module.runtime.id})[ \t]*\r?$"/>
+            </not>
+        </condition>
+        <fail if="source.module.bad.header"
+              message="Module ${code.name.base} is a source module (is.source.module=${is.source.module}) but its manifest.mf does not declare OpenIDE-Module-Source: ${source.module.runtime.id}. Add the header (and OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.${source.module.runtime.id}, see below), or set is.source.module=false."/>
+        <condition property="source.module.bad.token">
+            <not>
+                <matches string="${source.module.manifest.text}"
+                         pattern="OpenIDE-Module-Requires:(?:[^\n]|\n[ \t])*org\.netbeans\.modules\.source\.runtime\.${source.module.runtime.id}(?![\w.])"/>
+            </not>
+        </condition>
+        <fail if="source.module.bad.token"
+              message="Module ${code.name.base} is a source module (OpenIDE-Module-Source: ${source.module.runtime.id}) but its manifest.mf does not require the token org.netbeans.modules.source.runtime.${source.module.runtime.id}. The module system needs that requirement to enable the runtime module first: add OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.${source.module.runtime.id} (merged with any existing tokens on the same, comma-separated, header)."/>
     </target>
 
     <target name="-do-jar" depends="init,compile,jar-prep,-pre-jar,-do-jar-source-pure,-do-jar-source-hybrid,-do-jar-binary" unless="is.jar.uptodate"/>

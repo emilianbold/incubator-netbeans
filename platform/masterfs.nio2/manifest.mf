@@ -3,4 +3,5 @@ OpenIDE-Module: org.netbeans.modules.masterfs.nio2
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/masterfs/watcher/nio2/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.50
 OpenIDE-Module-Provides: org.netbeans.modules.masterfs.providers.Notifier
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

@@ -55,6 +55,7 @@ public class SourceModuleTest extends SetupHid {
 
     private File depJar;
     private File srcJar;
+    private File rtJar;
 
     protected @Override void setUp() throws Exception {
         super.setUp();
@@ -63,6 +64,8 @@ public class SourceModuleTest extends SetupHid {
         makeDepModule(depJar);
         srcJar = new File(jars, "src-module.jar");
         makeSourceModule(srcJar, "v1", false);
+        rtJar = new File(jars, "java-runtime.jar");
+        makeJavaRuntimeModule(rtJar);
     }
 
     protected @Override void tearDown() throws Exception {
@@ -80,8 +83,14 @@ public class SourceModuleTest extends SetupHid {
         return createAndEnable(mgr)[1];
     }
 
-    /** Creates both modules, enables them, and returns [dependency, source]. */
+    /** Creates the runtime provider and both modules, enables the two
+     *  modules (the token requirement pulls the provider in), and
+     *  returns [dependency, source]. */
     private Module[] createAndEnable(ModuleManager mgr) throws Exception {
+        // The Java runtime module is an autoload in production; only an
+        // autoload (or eager) provider may be pulled into the enable set
+        // without being part of the requested modules.
+        Module rt = mgr.create(rtJar, null, false, true, false);
         Module dep = mgr.create(depJar, null, false, false, false);
         Module src = mgr.create(srcJar, null, false, false, false);
         mgr.mutexPrivileged().enterWriteAccess();
@@ -90,7 +99,38 @@ public class SourceModuleTest extends SetupHid {
         } finally {
             mgr.mutexPrivileged().exitWriteAccess();
         }
+        assertTrue("the token requirement must have enabled the runtime module", rt.isEnabled());
         return new Module[] {dep, src};
+    }
+
+    /**
+     * The java runtime is an ordinary module discovered through the
+     * token/service mechanism, like any other runtime: enabling a source
+     * module without a module dependency on the provider still pulls the
+     * provider in through the OpenIDE-Module-Requires token alone.
+     */
+    public void testTokenRequirementPullsRuntimeModule() throws Exception {
+        ModuleManager mgr = newManager();
+        Module[] mods = createAndEnable(mgr);
+        assertEquals("v1", mods[1].getClassLoader().loadClass("org.foo.srcmod.Src").getField("ID").get(null)); // NOI18N
+        // And a manager in which the provider was never created reports a
+        // missing dependency instead of a confusing runtime error:
+        ModuleManager mgr2 = newManager();
+        mgr2.mutexPrivileged().enterWriteAccess();
+        try {
+            Module dep = mgr2.create(depJar, null, false, false, false);
+            Module src = mgr2.create(srcJar, null, false, false, false);
+            try {
+                mgr2.enable(new HashSet<Module>(Arrays.asList(dep, src)));
+                fail("enablement without any token provider should fail");
+            } catch (IllegalArgumentException ex) {
+                // IllegalModuleException (ENABLE_MISSING): the token
+                // requirement cannot be satisfied.
+                assertFalse(src.isEnabled());
+            }
+        } finally {
+            mgr2.mutexPrivileged().exitWriteAccess();
+        }
     }
 
     public void testLazyCompilationDefersUntilFirstUse() throws Exception {
@@ -149,13 +189,15 @@ public class SourceModuleTest extends SetupHid {
         Map<String,String> manifest = new HashMap<>();
         manifest.put("OpenIDE-Module", "org.foo.shippedlayer"); // NOI18N
         manifest.put("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
-        manifest.put("OpenIDE-Module-Source", "true"); // NOI18N
+        manifest.put("OpenIDE-Module-Source", "java"); // NOI18N
+        manifest.put("OpenIDE-Module-Requires", SourceRuntime.TOKEN_PREFIX + "java"); // NOI18N
         File jar = new File(jars, "shipped-layer-module.jar"); // NOI18N
         createJar(jar, contents, manifest);
 
         ModuleManager mgr = newManager();
         mgr.mutexPrivileged().enterWriteAccess();
         try {
+            mgr.create(rtJar, null, false, true, false);
             Module m = mgr.create(jar, null, false, false, false);
             mgr.enable(new HashSet<Module>(Collections.singleton(m)));
             // The layer is served straight from the JAR...
@@ -216,7 +258,8 @@ public class SourceModuleTest extends SetupHid {
         wm.put("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
         wm.put("OpenIDE-Module-Public-Packages", "wrap.*, com.foo.ext.*"); // NOI18N
         wm.put("Class-Path", "ext/dep.jar"); // NOI18N
-        wm.put("OpenIDE-Module-Source", "true"); // NOI18N
+        wm.put("OpenIDE-Module-Source", "java"); // NOI18N
+        wm.put("OpenIDE-Module-Requires", SourceRuntime.TOKEN_PREFIX + "java"); // NOI18N
         createJar(wrapJar, contents, wm);
 
         // A binary dependent whose class references the ext package:
@@ -255,6 +298,7 @@ public class SourceModuleTest extends SetupHid {
     }
 
     private Module[] enablePair(ModuleManager mgr, File jarA, File jarB) throws Exception {
+        mgr.create(rtJar, null, false, true, false);
         mgr.mutexPrivileged().enterWriteAccess();
         try {
             Module a = mgr.create(jarA, null, false, false, false);
@@ -275,7 +319,7 @@ public class SourceModuleTest extends SetupHid {
         manifest.put("OpenIDE-Module", "org.foo.frag"); // NOI18N
         manifest.put("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
         manifest.put("OpenIDE-Module-Fragment-Host", "org.foo.host"); // NOI18N
-        manifest.put("OpenIDE-Module-Source", "true"); // NOI18N
+        manifest.put("OpenIDE-Module-Source", "java"); // NOI18N
         File jar = new File(jars, "fragment-source-module.jar"); // NOI18N
         createJar(jar, contents, manifest);
 
@@ -452,6 +496,7 @@ public class SourceModuleTest extends SetupHid {
             ModuleManager mgr = newManager();
             mgr.mutexPrivileged().enterWriteAccess();
             try {
+                mgr.create(rtJar, null, false, true, false);
                 Module dep = mgr.create(depJar, null, false, false, false);
                 Module src = mgr.create(srcJar, null, false, false, false);
                 try {
@@ -544,6 +589,44 @@ public class SourceModuleTest extends SetupHid {
         }
     }
 
+    /**
+     * Builds the Java-runtime provider module for the tests: the real
+     * {@code org.netbeans.modules.source.java.JavaSourceRuntime} (from
+     * the test classpath - keep the test dependency on the
+     * {@code org.netbeans.modules.source.java} module in project.xml),
+     * packaged as a module providing the java token through the same
+     * service/token discovery production uses.
+     */
+    private static void makeJavaRuntimeModule(File jar) throws Exception {
+        byte[] rtClass = readClassBytes("org.netbeans.modules.source.java.JavaSourceRuntime");
+        Manifest mf = new Manifest();
+        mf.getMainAttributes().putValue("Manifest-Version", "1.0");
+        mf.getMainAttributes().putValue("OpenIDE-Module", "org.foo.javart"); // NOI18N
+        mf.getMainAttributes().putValue("OpenIDE-Module-Specification-Version", "1.0");
+        mf.getMainAttributes().putValue("OpenIDE-Module-Public-Packages", "org.netbeans.modules.source.java.*"); // NOI18N
+        mf.getMainAttributes().putValue("OpenIDE-Module-Provides", SourceRuntime.TOKEN_PREFIX + "java"); // NOI18N
+        try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(jar), mf)) {
+            addJarEntry(jos, "META-INF/services/org.netbeans.SourceRuntime", // NOI18N
+                    "org.netbeans.modules.source.java.JavaSourceRuntime\n" // NOI18N
+                            .getBytes(StandardCharsets.UTF_8));
+            addJarEntry(jos, "org/netbeans/modules/source/java/JavaSourceRuntime.class", rtClass);
+        }
+    }
+
+    private static byte[] readClassBytes(String fqcn) throws IOException {
+        String path = fqcn.replace('.', '/') + ".class"; // NOI18N
+        try (InputStream is = SourceModuleTest.class.getClassLoader().getResourceAsStream(path)) {
+            assertNotNull(fqcn + " not on the test classpath - is platform/source.java built?", is);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            byte[] b = new byte[4096];
+            int len;
+            while ((len = is.read(b)) != -1) {
+                baos.write(b, 0, len);
+            }
+            return baos.toByteArray();
+        }
+    }
+
     /** Creates a binary dependency module exporting a tiny API class. */
     private static void makeDepModule(File jar) throws Exception {
         File src = new File(jar.getParentFile(), "dep-src/org/foo/depapi/DepApi.java"); // NOI18N
@@ -602,7 +685,8 @@ public class SourceModuleTest extends SetupHid {
         manifest.put("OpenIDE-Module", "org.foo.srcmod"); // NOI18N
         manifest.put("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
         manifest.put("OpenIDE-Module-Module-Dependencies", "org.foo.depapi > 1.0"); // NOI18N
-        manifest.put("OpenIDE-Module-Source", "true"); // NOI18N
+        manifest.put("OpenIDE-Module-Source", "java"); // NOI18N
+        manifest.put("OpenIDE-Module-Requires", SourceRuntime.TOKEN_PREFIX + "java"); // NOI18N
         // Build-time hint: this module's annotations generate no layer.
         contents.put("META-INF/generated-layer.hint", "layer=false"); // NOI18N
         createJar(jar, contents, manifest);
@@ -646,6 +730,10 @@ public class SourceModuleTest extends SetupHid {
             }
             data = baos.toByteArray();
         }
+        addJarEntry(jos, path, data);
+    }
+
+    private static void addJarEntry(JarOutputStream jos, String path, byte[] data) throws IOException {
         JarEntry je = new JarEntry(path);
         je.setSize(data.length);
         CRC32 crc = new CRC32();

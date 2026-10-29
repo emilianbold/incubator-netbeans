@@ -41,7 +41,9 @@ import org.openide.modules.Places;
  * module (complete manifest, resources at the root), except that it holds
  * source files where a binary module holds compiled classes; the
  * manifest must carry {@code OpenIDE-Module-Source: <runtime id>}
- * ({@code true} meaning the built-in Java runtime).
+ * ({@code true} is accepted as a legacy alias for the Java runtime)
+ * plus the matching token requirement, so that the module system
+ * enables the runtime provider module before this module.
  * <p>
  * When the module is enabled, a {@link SourceRuntime} compiles/materializes
  * its sources on demand (see {@link SourceModuleCompiler}) into the user
@@ -284,24 +286,20 @@ class SourceModule extends StandardModule {
         }
 
         // Resolve the runtime eagerly: SourceRuntime.find inspects the
-        // manager, so it must happen here, under the write mutex. ensureCompiled
-        // (called from arbitrary lock contexts) only reads the result.
-        String rtId = runtimeId(getManifest());
-        if (rtId != null) {
-            runtime = resolveRuntime();
-        }
+        // manager, so it must happen here, under the write mutex.
+        // ensureCompiled (called from arbitrary lock contexts) only
+        // reads the result. This also enforces the token requirement.
+        runtime = resolveRuntime();
+
+        ClassLoader[] parentLoaders = loaders.toArray(new ClassLoader[0]);
 
         // Interpreter mode: the runtime serves classes and resources from
         // source form; nothing is materialized or cached.
-        if (rtId != null && !"java".equals(rtId)) { // NOI18N
-            SourceRuntime rt = runtime;
-            ClassLoader sourceLoader = rt.createSourceLoader(
-                    this, computeClasspath(), loaders.toArray(new ClassLoader[0]));
-            if (sourceLoader != null) {
-                Util.err.log(Level.FINE, "source module {0} interpreted by {1}", new Object[] {this, rt.getId()});
-                classloader = new RuntimeModuleClassLoader(sourceLoader, loaders.toArray(new ClassLoader[0]));
-                return;
-            }
+        ClassLoader sourceLoader = runtime.createSourceLoader(this, computeClasspath(), parentLoaders);
+        if (sourceLoader != null) {
+            Util.err.log(Level.FINE, "source module {0} interpreted by {1}", new Object[] {this, runtime.getId()});
+            classloader = new RuntimeModuleClassLoader(sourceLoader, parentLoaders);
+            return;
         }
 
         // Bytecode mode: snapshot all manager-dependent compile inputs
@@ -352,16 +350,17 @@ class SourceModule extends StandardModule {
         snapshotLoaderSuffix = loaderSuffix;
         moduleParents = loaders;
 
-        // The built-in Java runtime compiles lazily: enablement only creates
-        // the loader, the build happens on first use (or right here in
-        // fail-fast mode). Non-Java runtimes may generate arbitrary output
-        // the lazy loader cannot classify, so they compile eagerly at
-        // enablement and use the ordinary module classloader.
+        // Runtimes that support lazy compilation (the Java one) get a
+        // lazy loader: enablement only creates the loader, the build
+        // happens on first use (or right here in fail-fast mode). Other
+        // runtimes may generate arbitrary output the lazy loader cannot
+        // classify, so they compile eagerly at enablement and use the
+        // ordinary module classloader.
         realLoader = null;
         compiledClasses = null;
         compileFailure = null;
-        if (rtId == null || "java".equals(rtId)) { // NOI18N
-            classloader = new LazySourceModuleClassLoader(loaders.toArray(new ClassLoader[0]));
+        if (runtime.supportsLazyCompilation()) {
+            classloader = new LazySourceModuleClassLoader(parentLoaders);
             if (Boolean.getBoolean(EAGER_PROP)) {
                 ensureCompiled();
             }
@@ -373,33 +372,30 @@ class SourceModule extends StandardModule {
 
     /**
      * Resolves the source runtime requested by this module's manifest.
-     * Non-Java runtimes must be backed by an enabled module, so the
-     * manifest must require the matching token - otherwise the module
-     * system has no reason to enable the runtime first.
+     * Runtimes are backed by an enabled module, so the manifest must
+     * require the matching token - otherwise the module system has no
+     * reason to enable the runtime first.
      */
     private SourceRuntime resolveRuntime() throws IOException {
         String id = runtimeId(getManifest());
         String token = SourceRuntime.TOKEN_PREFIX + id;
-        boolean javaRuntime = "java".equals(id); // NOI18N
-        if (!javaRuntime) {
-            String requires = getManifest().getMainAttributes().getValue("OpenIDE-Module-Requires"); // NOI18N
-            boolean required = requires != null;
-            if (required) {
-                required = false;
-                for (String tok : requires.split("\\s*,\\s*")) { // NOI18N
-                    if (tok.equals(token)) {
-                        required = true;
-                        break;
-                    }
+        String requires = getManifest().getMainAttributes().getValue("OpenIDE-Module-Requires"); // NOI18N
+        boolean required = requires != null;
+        if (required) {
+            required = false;
+            for (String tok : requires.split("\\s*,\\s*")) { // NOI18N
+                if (tok.equals(token)) {
+                    required = true;
+                    break;
                 }
             }
-            if (!required) {
-                throw new IOException(
-                    "Source module " + getCodeNameBase() + " uses runtime '" + id + "' " // NOI18N
-                    + "but does not require the token " + token + ". " // NOI18N
-                    + "Declare OpenIDE-Module-Requires: " + token // NOI18N
-                    + " and have a module providing the token (OpenIDE-Module-Provides: " + token + ")."); // NOI18N
-            }
+        }
+        if (!required) {
+            throw new IOException(
+                "Source module " + getCodeNameBase() + " uses runtime '" + id + "' " // NOI18N
+                + "but does not require the token " + token + ". " // NOI18N
+                + "Declare OpenIDE-Module-Requires: " + token // NOI18N
+                + " and have a module providing the token (OpenIDE-Module-Provides: " + token + ")."); // NOI18N
         }
         return SourceRuntime.find(getManager(), id);
     }

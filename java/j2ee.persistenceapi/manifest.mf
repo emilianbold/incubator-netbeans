@@ -3,4 +3,5 @@ OpenIDE-Module: org.netbeans.modules.j2ee.persistenceapi/1
 OpenIDE-Module-Implementation-Version: 1
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/j2ee/persistenceapi/resources/Bundle.properties
 AutoUpdate-Show-In-Client: false
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

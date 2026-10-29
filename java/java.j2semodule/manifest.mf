@@ -4,5 +4,6 @@ OpenIDE-Module: org.netbeans.modules.java.j2semodule
 OpenIDE-Module-Layer: org/netbeans/modules/java/j2semodule/ui/resources/layer.xml
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/java/j2semodule/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.37
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

@@ -4,4 +4,5 @@ OpenIDE-Module: org.netbeans.modules.testng.ant
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/testng/ant/Bundle.properties
 OpenIDE-Module-Provides: org.netbeans.modules.testng.ant.AntTestNGSupport
 OpenIDE-Module-Specification-Version: 2.50
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

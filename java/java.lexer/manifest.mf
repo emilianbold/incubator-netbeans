@@ -2,5 +2,6 @@ OpenIDE-Module: org.netbeans.modules.java.lexer/1
 OpenIDE-Module-Localizing-Bundle: org/netbeans/lib/java/lexer/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.71
 OpenIDE-Module-Layer: org/netbeans/lib/java/lexer/layer.xml
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

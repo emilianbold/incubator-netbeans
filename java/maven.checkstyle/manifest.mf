@@ -3,5 +3,6 @@ AutoUpdate-Show-In-Client: false
 OpenIDE-Module: org.netbeans.modules.maven.checkstyle
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/maven/checkstyle/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.52
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

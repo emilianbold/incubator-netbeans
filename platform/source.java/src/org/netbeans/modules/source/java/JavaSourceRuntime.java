@@ -17,45 +17,51 @@
  * under the License.
  */
 
-package org.netbeans;
+package org.netbeans.modules.source.java;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.tools.Diagnostic;
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
+import org.netbeans.SourceRuntime;
 
 /**
- * The built-in Java source runtime: compiles the module's sources with the
- * system Java compiler (in-process {@code javax.tools}), so NetBeans has to
- * be executed on a JDK rather than a bare JRE. Annotation processors
- * shipped inside the dependency module JARs are run exactly like during an
- * ant build ({@code -proc:full}, no extra {@code -A} options), so
- * everything the harness generates at build time - {@code META-INF/services/*}
- * registrations, {@code META-INF/generated-layer.xml}, merged
- * {@code Bundle.properties} files - is regenerated here.
+ * The Java source runtime: compiles a source-only module's sources with
+ * the system Java compiler (in-process {@code javax.tools}), so NetBeans
+ * has to be executed on a JDK rather than a bare JRE. Annotation
+ * processors shipped inside the dependency module JARs are run exactly
+ * like during an ant build ({@code -proc:full}, no extra {@code -A}
+ * options), so everything the harness generates at build time -
+ * {@code META-INF/services/*} registrations,
+ * {@code META-INF/generated-layer.xml}, merged {@code Bundle.properties}
+ * files - is regenerated here.
+ * <p>
+ * This module is an ordinary autoload pulled in by the
+ * {@code org.netbeans.modules.source.runtime.java} token that every Java
+ * source module requires - the module system itself knows nothing
+ * special about Java, see {@link SourceRuntime}.
  *
  * @see SourceRuntime
- * @see SourceModuleCompiler
  */
-final class JavaSourceRuntime extends SourceRuntime {
+public class JavaSourceRuntime extends SourceRuntime {
 
-    private static final JavaSourceRuntime DEFAULT = new JavaSourceRuntime();
+    private static final Logger LOG = Logger.getLogger(JavaSourceRuntime.class.getName());
 
-    static JavaSourceRuntime getDefault() {
-        return DEFAULT;
-    }
-
-    private JavaSourceRuntime() {
-    }
+    /** Maximal number of compiler diagnostics reported in the exception message. */
+    private static final int MAX_ERRORS = 20;
 
     public @Override String getId() {
         return "java"; // NOI18N
@@ -63,6 +69,16 @@ final class JavaSourceRuntime extends SourceRuntime {
 
     public @Override String getVersion() {
         return System.getProperty("java.version") + '/' + System.getProperty("java.vendor"); // NOI18N
+    }
+
+    /**
+     * The Java build's output layout is exactly what the module system's
+     * lazy loader expects: hybrid JARs ship the build-time generated
+     * artifacts (which this runtime regenerates from the same sources)
+     * and class loads can be deferred to the first use.
+     */
+    public @Override boolean supportsLazyCompilation() {
+        return true;
     }
 
     public @Override void build(File srcDir, File outputDir, List<File> classpath) throws IOException {
@@ -130,14 +146,13 @@ final class JavaSourceRuntime extends SourceRuntime {
             try {
                 fileManager.close();
             } catch (IOException ex) {
-                SourceModuleCompiler.LOG.log(Level.FINE, "Cannot close file manager", ex);
+                LOG.log(Level.FINE, "Cannot close file manager", ex); // NOI18N
             }
         }
         if (!success) {
             throw new IOException("Compilation failed:\n" + formatDiagnostics(diagnostics)); // NOI18N
         }
     }
-
 
     private static String formatDiagnostics(DiagnosticCollector<JavaFileObject> diagnostics) {
         StringBuilder sb = new StringBuilder();
@@ -146,7 +161,7 @@ final class JavaSourceRuntime extends SourceRuntime {
             if (d.getKind() != Diagnostic.Kind.ERROR) {
                 continue;
             }
-            if (count++ == SourceModuleCompiler.MAX_ERRORS) {
+            if (count++ == MAX_ERRORS) {
                 sb.append("... (further errors suppressed)\n"); // NOI18N
                 break;
             }
@@ -169,17 +184,6 @@ final class JavaSourceRuntime extends SourceRuntime {
                 || (v.feature() == 11 && v.update() >= 21);
     }
 
-    static String joinPaths(List<File> files) {
-        StringBuilder sb = new StringBuilder();
-        for (File f : files) {
-            if (sb.length() > 0) {
-                sb.append(File.pathSeparatorChar);
-            }
-            sb.append(f.getPath());
-        }
-        return sb.toString();
-    }
-
     /**
      * Copies resources (everything that is not a Java source) from the
      * source tree into the output directory, mirroring what the ant
@@ -194,10 +198,22 @@ final class JavaSourceRuntime extends SourceRuntime {
             if (kid.isDirectory()) {
                 copyResources(kid, new File(classesDir, kid.getName()));
             } else if (!kid.getName().endsWith(".java")) { // NOI18N
+                File target = new File(classesDir, kid.getName());
                 if (!classesDir.isDirectory() && !classesDir.mkdirs()) {
                     throw new IOException("Cannot create " + classesDir); // NOI18N
                 }
-                SourceModuleCompiler.copyFile(kid, new File(classesDir, kid.getName()));
+                copyFile(kid, target);
+            }
+        }
+    }
+
+    private static void copyFile(File from, File to) throws IOException {
+        try (InputStream is = new FileInputStream(from);
+             OutputStream os = new FileOutputStream(to)) {
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = is.read(buffer)) != -1) {
+                os.write(buffer, 0, len);
             }
         }
     }

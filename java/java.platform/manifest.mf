@@ -4,4 +4,5 @@ OpenIDE-Module-Specification-Version: 1.77
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/java/platform/Bundle.properties
 AutoUpdate-Show-In-Client: false
 OpenIDE-Module-Recommends: org.netbeans.modules.java.platform.ui
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

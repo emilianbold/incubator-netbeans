@@ -3,4 +3,5 @@ AutoUpdate-Show-In-Client: false
 OpenIDE-Module: org.netbeans.modules.gradle.test
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/gradle/test/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.32
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

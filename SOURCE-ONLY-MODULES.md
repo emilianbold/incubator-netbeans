@@ -28,8 +28,15 @@ source files where a binary module holds compiled classes. The manifest
 must carry one extra header, whose value names the **source runtime**
 responsible for compiling/materializing it:
 
-    OpenIDE-Module-Source: true        # (or "java") the built-in Java runtime
+    OpenIDE-Module-Source: java        # the Java runtime module
     OpenIDE-Module-Source: clojure     # a registered non-Java runtime (see below)
+
+and the matching token requirement, which makes the module system enable
+the runtime provider before the module itself (the same standard
+`OpenIDE-Module-Requires`/`Provides` mechanism the Platform has always
+used for optional functionality):
+
+    OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.<runtime id>
 
 Two variants exist:
 
@@ -39,10 +46,21 @@ Two variants exist:
   the sources; the classes are only there so that *not yet converted*
   modules which depend on this one can still be compiled at build time.
 
-### Runtime (platform/o.n.bootstrap)
+### Runtime (platform/o.n.bootstrap + platform/source.java)
+
+The module system is language-agnostic: **every** runtime - Java included -
+is an ordinary module. `o.n.bootstrap` carries the engine (extraction,
+stamping, classloading, laziness); the Java runtime ships as
+`org.netbeans.modules.source.java` (an autoload in the platform cluster,
+`platform/source.java`), which provides the
+`org.netbeans.modules.source.runtime.java` token and registers
+`org.netbeans.modules.source.java.JavaSourceRuntime` in
+`META-INF/services/org.netbeans.SourceRuntime`. A module with no runtime
+provider available simply reports a missing dependency (the token), with
+a clear message, instead of a confusing compile failure.
 
 * `ModuleFactory.create` inspects the manifest of every module JAR it is
-  asked to create. If it sees `OpenIDE-Module-Source: true` it creates a
+  asked to create. If it sees `OpenIDE-Module-Source` it creates a
   `SourceModule` instead of a `StandardModule`.
 * `SourceModule.classLoaderUp` (i.e. when the module is enabled) calls
   `SourceModuleCompiler.compileIfNeeded`, then builds the module
@@ -118,7 +136,13 @@ A module opts in via `nbproject/project.properties`:
 
     is.source.module=true
 
-plus the `OpenIDE-Module-Source: true` header in `manifest.mf`. By default
+plus the two manifest headers in `manifest.mf`:
+
+    OpenIDE-Module-Source: java
+    OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
+
+(the token requirement is verified by the harness at build time; the
+module system enables the Java runtime module, an autoload, first). By default
 it is then packaged in **hybrid** form: the complete build output -
 compiled classes (as before, so the public-package-jars distillation and
 every binary dependent keep working unchanged), resources, and all
@@ -161,7 +185,9 @@ the built cluster.
 
 ### Converting a module (recipe)
 
-1. `manifest.mf`: add `OpenIDE-Module-Source: true`.
+1. `manifest.mf`: add `OpenIDE-Module-Source: java` and
+   `OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java`
+   (merged into any existing `OpenIDE-Module-Requires`).
 2. `nbproject/project.properties`: add `is.source.module=true`.
 3. Rebuild. Done - the runtime does the rest.
 4. (Later, when safe: add `source.module.pure=true`.)
@@ -299,13 +325,12 @@ the usual manifest/dependencies/layers. The `OpenIDE-Module-Source` header
 therefore carries the id of the **source runtime** responsible for the
 module:
 
-    OpenIDE-Module-Source: true        # Java, built into the Platform (as shipped today)
-    OpenIDE-Module-Source: java        # ditto, explicit
+    OpenIDE-Module-Source: java        # the org.netbeans.modules.source.java module
     OpenIDE-Module-Source: clojure     # a registered SourceRuntime with id "clojure" is required
 
 The `SourceRuntime` SPI lives in `o.n.bootstrap` (same pattern as
-`NetigsoFramework`: abstract base in the bootstrap, implementation in a
-regular module):
+`NetigsoFramework`: abstract base in the bootstrap, implementations in
+regular modules):
 
 ```java
 public abstract class SourceRuntime {
@@ -321,22 +346,25 @@ public abstract class SourceRuntime {
     public ClassLoader createSourceLoader(Module m, List<File> classpath, ClassLoader[] parents) { return null; }
     /** Bytecode mode: build loadable output into the (empty) directory. */
     public void build(File srcDir, File outputDir, List<File> classpath) throws IOException { ... }
-    /** Finds a runtime: "true"/"java" -> built-in; otherwise enabled token providers. */
+    /** Whether the build output suits the module system's lazy loader
+        (deferred compilation, shipped artifacts served pre-compile). */
+    public boolean supportsLazyCompilation() { return false; }
+    /** Finds a runtime among enabled token providers. */
     public static SourceRuntime find(ModuleManager mgr, String id) throws IOException;
 }
 ```
 
-The built-in Java runtime (`JavaSourceRuntime`) is what the Platform
-supports out of the box - it needs nothing but the JDK. Runtimes for
-other languages are regular modules: they declare
+Every runtime - Java included - is a regular module: it declares
 `OpenIDE-Module-Provides: org.netbeans.modules.source.runtime.<id>`,
-register the implementation in
-`META-INF/services/org.netbeans.SourceRuntime`, and are found through the
-*enabled* module that provides the token. A module using such a runtime
-must declare the matching `OpenIDE-Module-Requires` token (validated with
-an instructive error otherwise), which makes the existing dependency
-resolver enable the runtime before its source modules - the
-chicken-and-egg solved with zero new ordering concepts.
+registers the implementation in
+`META-INF/services/org.netbeans.SourceRuntime`, and is found through the
+*enabled* module that provides the token. The Java runtime
+(`org.netbeans.modules.source.java`, an autoload in the platform cluster)
+compiles with the JDK's `javax.tools`. A source module must declare the
+matching `OpenIDE-Module-Requires` token (validated with an instructive
+error otherwise, and by the harness at build time), which makes the
+existing dependency resolver enable the runtime before its source modules
+- the chicken-and-egg solved with zero new ordering concepts.
 
 Two integration modes exist; a runtime picks one:
 
@@ -432,7 +460,7 @@ interpreted, or the runtime should materialize output.
   resource to exist, so interpreter-mode installers may need a small
   module-system accommodation).
 
-* **Build systems and the SPI.** The built-in Java runtime bakes in the
+* **Build systems and the SPI.** The Java runtime module bakes in the
   ant-harness conventions (sources at the JAR root, resource copying,
   processorpath = declared dependency JARs, no `-A` options) - which is
   correct, since that is what a "plain" NetBeans module *is*. A module
@@ -458,11 +486,16 @@ interpreted, or the runtime should materialize output.
 ## Pointers
 
 * Runtime: `platform/o.n.bootstrap/src/org/netbeans/SourceModule.java`,
-  `SourceRuntime.java` (SPI), `JavaSourceRuntime.java` (built-in),
-  `SourceModuleCompiler.java` (language-agnostic driver),
-  `ModuleFactory.java`, `StandardModule.java` (`findPatches` visibility).
+  `SourceRuntime.java` (SPI), `SourceModuleCompiler.java`
+  (language-agnostic driver), `ModuleFactory.java`,
+  `StandardModule.java` (`findPatches` visibility).
+* Java runtime module: `platform/source.java/`
+  (`org.netbeans.modules.source.java`, autoload, provides the
+  `org.netbeans.modules.source.runtime.java` token, registers
+  `JavaSourceRuntime` via `META-INF/services`).
 * Tests: `platform/o.n.bootstrap/test/unit/src/org/netbeans/SourceModuleTest.java`
-  (Java path), `SourceRuntimeTest.java` (SPI with a simulated
+  (Java path, using the real runtime module through the token/service
+  discovery), `SourceRuntimeTest.java` (SPI with a simulated
   non-Java runtime).
 * Harness: `nbbuild/templates/common.xml` (`-do-jar-source-pure`,
   `-do-jar-source-hybrid`, `-check-compile`).

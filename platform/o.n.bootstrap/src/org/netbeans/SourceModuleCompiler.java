@@ -45,13 +45,14 @@ import org.openide.modules.Places;
 
 /**
  * Drives on-demand compilation of source-only modules at enablement time.
- * Language-specific work is delegated to a {@link SourceRuntime} (Java by
- * default; other source languages can register their own runtimes through
- * modules). This class is the language-agnostic machinery:
+ * Language-specific work is delegated to a {@link SourceRuntime} - always
+ * provided by a module (the Java one ships as
+ * {@code org.netbeans.modules.source.java}). This class is the
+ * language-agnostic machinery:
  * <p>
  * A source-only module is a regular module JAR whose manifest carries the
  * {@code OpenIDE-Module-Source} header (value: the runtime id, or
- * {@code true}/{@code java} for the built-in Java runtime) and which
+ * {@code true} as a legacy alias for {@code java}) and which
  * contains the module's sources and resources at the JAR root, in the same
  * layout a binary module would have, except that source files appear in
  * place of the compiled class files.
@@ -147,7 +148,7 @@ final class SourceModuleCompiler {
                 "Compilation of source module " + cnb + " failed" // NOI18N
                 + (detail != null && !detail.isEmpty() ? ":\n" + detail : "")
                 + "\n[classes tree: " + layout + "]" // NOI18N
-                + "\n[classpath: " + JavaSourceRuntime.joinPaths(classpath) + "]", ex);
+                + "\n[classpath: " + SourceRuntime.joinPaths(classpath) + "]", ex);
         }
 
         writeStamp(stampFile, stamp);

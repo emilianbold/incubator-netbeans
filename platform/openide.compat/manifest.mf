@@ -4,5 +4,6 @@ OpenIDE-Module-Specification-Version: 6.75
 OpenIDE-Module-Deprecated: true
 OpenIDE-Module-Localizing-Bundle: org/openide/compat/Bundle.properties
 AutoUpdate-Essential-Module: true
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

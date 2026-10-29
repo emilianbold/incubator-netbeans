@@ -6,4 +6,5 @@ OpenIDE-Module-Layer: org/netbeans/modules/java/platform/resources/layer.xml
 AutoUpdate-Show-In-Client: false
 OpenIDE-Module-Recommends: j2seplatform
 OpenIDE-Module-Provides: org.netbeans.modules.java.platform.ui
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

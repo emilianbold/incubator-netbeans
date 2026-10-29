@@ -4,5 +4,6 @@ OpenIDE-Module-Localizing-Bundle: org/openide/actions/Bundle.properties
 AutoUpdate-Essential-Module: true
 OpenIDE-Module-Recommends: org.openide.util.spi.SVGLoader
 OpenIDE-Module-Specification-Version: 6.74
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

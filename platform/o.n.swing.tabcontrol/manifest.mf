@@ -3,5 +3,6 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/swing/tabcontrol/Bundle.propertie
 OpenIDE-Module: org.netbeans.swing.tabcontrol
 OpenIDE-Module-Specification-Version: 1.92
 AutoUpdate-Essential-Module: true
-OpenIDE-Module-Source: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 
