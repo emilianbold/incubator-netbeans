@@ -127,7 +127,7 @@ final class SourceModuleCompiler {
         }
 
         extractSources(jar, src);
-        if (!hasFiles(src) && !hasFiles(classes)) {
+        if (!hasFiles(src)) {
             deleteRecursively(classes);
             throw new IOException("No sources found in source module " + cnb + " (" + jar + ")"); // NOI18N
         }
@@ -151,7 +151,11 @@ final class SourceModuleCompiler {
         }
 
         writeStamp(stampFile, stamp);
-        LOG.log(Level.INFO, "compiled source module {0} ({1}) in {2} ms",
+        // The extracted source tree and annotation-processor sources are
+        // no longer needed once the classes exist; reclaim the disk space.
+        deleteRecursively(src);
+        deleteRecursively(gensrc);
+        LOG.log(Level.INFO, "compiled source module {0} ({1}) in {2} ms", // NOI18N
                 new Object[] {cnb, runtime.getId(), System.currentTimeMillis() - startTime});
         return classes;
     }
@@ -222,6 +226,10 @@ final class SourceModuleCompiler {
         Properties props = new Properties();
         try (InputStream is = new FileInputStream(stampFile)) {
             props.load(is);
+        } catch (IOException | IllegalArgumentException ex) {
+            // A corrupt/truncated stamp (crash during write) is just a
+            // cache miss - do not fail the module over it.
+            return ""; // NOI18N
         }
         return props.getProperty("stamp", ""); // NOI18N
     }
@@ -255,14 +263,15 @@ final class SourceModuleCompiler {
                     continue;
                 }
                 File target = new File(targetDir, name);
+                // Simple sanity check - entry names with ../ are not expected
+                // in module JARs but do not let them escape the cache dir.
+                // Checked before creating any directories.
+                if (!target.toPath().normalize().startsWith(targetDir.toPath().normalize())) {
+                    throw new IOException("Suspicious JAR entry name: " + entry.getName()); // NOI18N
+                }
                 File parent = target.getParentFile();
                 if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
                     throw new IOException("Cannot create " + parent); // NOI18N
-                }
-                // Simple sanity check - entry names with ../ are not expected
-                // in module JARs but do not let them escape the cache dir.
-                if (!target.toPath().normalize().startsWith(targetDir.toPath().normalize())) {
-                    throw new IOException("Suspicious JAR entry name: " + entry.getName()); // NOI18N
                 }
                 try (InputStream is = jarFile.getInputStream(entry);
                      OutputStream os = new FileOutputStream(target)) {

@@ -113,6 +113,15 @@ class StandardModule extends Module {
         return manifest;
     }
 
+    /**
+     * Supplies an already-loaded manifest (e.g. the factory pre-read the JAR
+     * to check the OpenIDE-Module-Source header) so the JAR is not parsed
+     * twice per module scan.
+     */
+    void preloadManifest(Manifest mf) {
+        manifest = mf;
+    }
+
     public @Override void releaseManifest() {
         manifest = null;
     }

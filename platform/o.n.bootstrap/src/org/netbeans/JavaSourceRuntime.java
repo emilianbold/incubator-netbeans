@@ -112,6 +112,10 @@ final class JavaSourceRuntime extends SourceRuntime {
         }
         options.add("-encoding"); // NOI18N
         options.add("UTF-8"); // NOI18N
+        // Debug info, like the harness' build.compiler.debug/debuglevel
+        // (source,lines,vars): without it, debugging a source module
+        // shows no local variables.
+        options.add("-g"); // NOI18N
         options.add("-nowarn"); // NOI18N
 
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();

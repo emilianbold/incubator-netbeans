@@ -366,10 +366,13 @@
              (sources + resources). Only safe when no binary module depends
              on this one. The manifest must carry OpenIDE-Module-Source: true;
              everything else (deps, spec version, ...) is computed as usual.
-             The module system compiles this JAR on demand at runtime. -->
+             The module system compiles this JAR on demand at runtime.
+             The side-path handwritten bundles ship here too (no generated
+             artifacts exist to serve, but the compile still needs them). -->
         <jarwithmoduleattributes jarfile="${cluster}/${module.jar}" compress="${build.package.compress}" index="${build.package.index}" manifest="${manifest.mf}" stamp="${cluster}/.lastModified">
             <fileset dir="${src.dir}" excludes="**/*.form,**/package.html,**/doc-files/"/>
             <fileset dir="${build.dir}/source-hints"/>
+            <fileset dir="${build.dir}/source-bundles"/>
         </jarwithmoduleattributes>
     </target>
     <target name="-do-jar-source-hybrid" depends="init,compile,jar-prep,-pre-jar,-source-module-hints" if="source.module.hybrid.pack" unless="is.jar.uptodate">

@@ -262,13 +262,15 @@ Suggested stages:
 * NetBeans must run on a JDK (in-process `javax.tools`). A fallback to
   nb-javac (`java/lib.nbjavac`, `java/libs.nbjavacapi`), which the IDE ships
   anyway for the Java editing model, would remove even that requirement.
+* Runtime compilation happens outside the module manager's mutex (a
+  dedicated `compileLock` per module; dependency compiles acquire locks
+  following the - acyclic - dependency DAG), so module-system writers are
+  never blocked behind a compile, and first-use compiles from classloading
+  threads cannot deadlock against enablement. A side effect is that two
+  independent modules may compile concurrently - safe, since their cache
+  directories are disjoint.
 * Localization variant JARs (`locale/*_cs.jar`) are not handled for source
   modules yet (sources are compiled base-locale only).
-* Runtime compilation is serialized by the module manager mutex; a future
-  optimization could compile independent modules in parallel.
-* The consistency verifier (`Asm`-based class linkage checks) only sees
-  packaged classes; source-module linkage is verified implicitly by the
-  compiler itself.
 * Module unit tests (`ant test-unit`) still need binary classes - run them
   with `-Dsource.module.compile=true` (hybrid modules always compile).
 * First-start cost: a fresh user dir compiles all enabled source modules

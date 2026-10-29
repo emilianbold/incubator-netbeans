@@ -43,9 +43,9 @@ import java.util.jar.Manifest;
  * done they are dead weight - the module system compiles from the
  * sources at runtime and ignores packaged classes entirely.
  * <p>
- * Cache-neutral by construction: the runtime's staleness stamp digests
- * only non-class entries, so trimming does not invalidate any existing
- * compilation cache.
+ * NOTE: trimming rewrites the JARs, changing their size/mtime, which the
+ * runtime staleness stamp records - developers with an existing cache
+ * recompile once after a trim. (The shipped artifact is fresh anyway.)
  * <p>
  * Usage: {@code java org.netbeans.nbbuild.TrimSourceModules <cluster-dir>...}
  *
@@ -105,6 +105,7 @@ public final class TrimSourceModules {
     /** Rewrites the JAR without any *.class entries, everything else byte-identical. */
     private static void trim(File jar) throws IOException {
         File tmp = new File(jar.getParentFile(), jar.getName() + ".trimming"); // NOI18N
+        tmp.deleteOnExit(); // do not litter modules/ on a crash
         try (JarFile src = new JarFile(jar)) {
             Manifest manifest = src.getManifest();
             try (JarOutputStream out = manifest != null

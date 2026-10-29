@@ -3,5 +3,4 @@ OpenIDE-Module: org.openide.execution.compat8
 OpenIDE-Module-Localizing-Bundle: org/openide/execution/compat8/Bundle.properties
 OpenIDE-Module-Specification-Version: 9.37
 OpenIDE-Module-Fragment-Host: org.openide.execution
-OpenIDE-Module-Source: true
 
