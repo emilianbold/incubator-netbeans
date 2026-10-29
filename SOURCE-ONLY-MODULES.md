@@ -379,15 +379,58 @@ interpreted, or the runtime should materialize output.
 
 ## Notes for later
 
-* **Demo runtime: Groovy.** Groovy is the ideal first real language runtime
-  because it can demonstrate the *entire* SPI with one language:
-  interpreter mode via `GroovyClassLoader` (serve `.groovy` sources
-  straight from the module JAR, classes defined in memory, nothing
-  materialized) and bytecode mode via `FileSystemCompiler` (AOT into the
-  cache directory with staleness-based recompilation) - the same module
-  flipped between modes shows that source code is the deployment artifact
-  and bytecode is merely an optional cache. Clojure as the dramatic second
-  (interpreter mode first, bytecode mode to fix its slow startup).
+* **Demo runtime: Groovy - VALIDATED LIVE.** The SPI is complete enough
+  to run real, non-Java source modules today; proven with Groovy 4.0.24
+  and two hand-crafted module JARs booted in the full IDE:
+
+  - a **runtime module** (`org.netbeans.libs.groovysrc`): ordinary
+    module declaring
+    `OpenIDE-Module-Provides: org.netbeans.modules.source.runtime.groovy`,
+    shipping groovy-all.jar on its `Class-Path`, and registering a
+    30-line `GroovySourceRuntime` via
+    `META-INF/services/org.netbeans.SourceRuntime`:
+
+  ```java
+  public class GroovySourceRuntime extends SourceRuntime {
+      public @Override String getId() { return "groovy"; }
+      public @Override String getVersion() { return GroovySystem.getVersion(); }
+      public @Override ClassLoader createSourceLoader(Module m, List<File> cp, ClassLoader[] parents) throws IOException {
+          GroovyClassLoader gcl = new GroovyClassLoader(parents.length == 0 ? null : parents[0]);
+          gcl.addClasspath(m.getJarFile().toURI().toURL().toString()); // the .groovy sources
+          for (File f : cp) {
+              gcl.addClasspath(f.toURI().toURL().toString()); // compile against deps
+          }
+          return gcl; // the module system wraps it with full module semantics
+      }
+  }
+  ```
+
+  - a **pure-Groovy source module** (`org.foo.groovydemo`): manifest with
+    `OpenIDE-Module-Source: groovy`,
+    `OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.groovy`,
+    a module dependency on the runtime module, and a
+    `OpenIDE-Module-Install: org/foo/groovydemo/Installer.class`
+    pointing at `Installer.groovy` (which the module system class-loads
+    at enablement - through Groovy, in memory); the JAR holds only
+    `.groovy` sources, a `Bundle.properties`, and a handwritten
+    `META-INF/services` registration served straight from the JAR.
+
+  Boot result: both modules enabled, the installer was compiled in
+  memory by GroovyClassLoader on first class load, executed at startup,
+  called `NbBundle` from a dependency module (parent-classloader
+  semantics intact), and printed `GROOVY-DEMO ran!` - with **zero**
+  javac/`javax.tools` involvement anywhere in the session. Interpreter
+  mode, nothing materialized or cached.
+
+  Remaining for production use: bytecode mode via `FileSystemCompiler`
+  for cached startup (the stamp already includes `getVersion()`, so a
+  Groovy upgrade invalidates caches); a real repo module carrying
+  groovy-all.jar as an external binary; harness packaging rules for
+  non-java source roots; and `OpenIDE-Module-Install` in Groovy source
+  form (note: the header takes a `.class` resource path - a runtime
+  resolving the installer class through its own loader needs the
+  resource to exist, so interpreter-mode installers may need a small
+  module-system accommodation).
 
 * **Build systems and the SPI.** The built-in Java runtime bakes in the
   ant-harness conventions (sources at the JAR root, resource copying,
