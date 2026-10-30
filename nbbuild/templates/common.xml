@@ -410,6 +410,14 @@
         <copy todir="${build.dir}/source-bundles/META-INF/netbeans/source-bundles">
             <fileset dir="${src.dir}" includes="**/Bundle.properties"/>
         </copy>
+        <!-- Marker: tells the runtime that this JAR follows the harness
+             contract - every Bundle.properties at a plain path is a merged
+             or purely generated build artifact, never a compile input (the
+             compile inputs are the side-path originals above). Externally
+             built source JARs carry no marker: their plain bundles are
+             their originals and ARE extracted. Fixed content only - it is
+             part of the staleness stamp. -->
+        <echo file="${build.dir}/source-bundles/META-INF/netbeans/source-bundles/.merged-plain-bundles">plain-path Bundle.properties files in this JAR are merged or generated copies, not compile inputs</echo>
         <condition property="source.module.layer.hint" value="layer=true">
             <and>
                 <isfalse value="${source.module.pure}"/>
