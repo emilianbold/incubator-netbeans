@@ -114,7 +114,11 @@ public abstract class ManifestSection<T> {
                 // Don't try to check .ser files: it is quite legitimate to
                 // serialize in a module objects whose class is from elsewhere
                 // (e.g. the core).
-                if (clazz.getClassLoader() != getClassLoader()) { // NOI18N
+                if (clazz.getClassLoader() != getClassLoader()
+                        // source-only modules load classes through an inner
+                        // loader of the module's classloader - Module.owns
+                        // recognizes those
+                        && !module.owns(clazz)) { // NOI18N
                     Events ev = module.getManager().getEvents();
                     ev.log(Events.WRONG_CLASS_LOADER, module, clazz, getClassLoader());
                 }

@@ -42,6 +42,21 @@ public class ModuleFactory {
     public Module create(File jar, Object history, boolean reloadable,
             boolean autoload, boolean eager, ModuleManager mgr, Events ev)
     throws IOException {
+        // Source-only modules are compiled on demand and loaded from the
+        // compilation output directory (see SourceModule).
+        Manifest mf = mgr.loadManifest(jar);
+        if (SourceModule.runtimeId(mf) != null) {
+            if (mf.getMainAttributes().getValue("OpenIDE-Module-Fragment-Host") != null) { // NOI18N
+                throw new InvalidException(null,
+                        "Source-only module JARs do not support fragment modules ("
+                        + jar + "): a fragment must share its host's classloader, which the "
+                        + "lazy source-module loader cannot do. Keep fragments binary."); // NOI18N
+            }
+            Module m = new SourceModule(mgr, ev, jar, history, reloadable, autoload, eager);
+            ((StandardModule) m).preloadManifest(mf);
+            m.dataWithCheck();
+            return m;
+        }
         final Boolean osgiStatus = mgr.isOSGi(jar);
         if (Boolean.TRUE.equals(osgiStatus)) {
             return new NetigsoModule(null, jar, mgr, ev, history, reloadable, autoload, eager);
@@ -49,6 +64,10 @@ public class ModuleFactory {
         Module m;
         try {
             m = new StandardModule(mgr, ev, jar, history, reloadable, autoload, eager);
+            // Reuse the manifest parsed above (the header check): the
+            // constructors would otherwise re-read the JAR, and the module
+            // scan parses every manifest already.
+            ((StandardModule) m).preloadManifest(mf);
             if (osgiStatus == null) {
                 m.dataWithCheck();
             }

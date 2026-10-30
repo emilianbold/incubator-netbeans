@@ -113,6 +113,15 @@ class StandardModule extends Module {
         return manifest;
     }
 
+    /**
+     * Supplies an already-loaded manifest (e.g. the factory pre-read the JAR
+     * to check the OpenIDE-Module-Source header) so the JAR is not parsed
+     * twice per module scan.
+     */
+    void preloadManifest(Manifest mf) {
+        manifest = mf;
+    }
+
     public @Override void releaseManifest() {
         manifest = null;
     }
@@ -272,7 +281,7 @@ class StandardModule extends Module {
     }
 
     @SuppressWarnings("ReturnOfCollectionOrArrayField") // collection is only accessed in StandardModule
-    private Set<File> findPatches() {
+    protected Set<File> findPatches() {
         if (patches == null) {
             // #9273: load any modules/patches/this-code-name/*.jar files first:
             File patchdir = new File(new File(jar.getParentFile(), "patches"), // NOI18N

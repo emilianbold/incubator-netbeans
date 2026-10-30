@@ -20,15 +20,43 @@
 
 -->
 <?xml-stylesheet type="text/xml" href="../../nbbuild/javadoctools/apichanges.xsl"?>
-<!DOCTYPE apichanges PUBLIC "-//NetBeans//DTD API changes list 1.0//EN" "../../nbbuild/javadoctools/apichanges.dtd">
+<!DOCTYPE apichanges PUBLIC "-//NetBeans//DTD API changes list 1.1//EN" "../../nbbuild/javadoctools/apichanges-1.1.dtd">
 
 <apichanges>
 
   <apidefs>
     <apidef name="launcher">Launcher &amp; CLI</apidef>
+    <apidef name="source.modules">Source-only Modules</apidef>
   </apidefs>
 
   <changes>
+    <change id="source.modules">
+        <api name="source.modules"/>
+        <summary>Source-only modules, compiled on demand by a source runtime</summary>
+        <version major="2" minor="115"/>
+        <date day="30" month="10" year="2026"/>
+        <author login="emilianbold"/>
+        <compatibility addition="yes" binary="compatible" semantic="compatible"/>
+        <description>
+            <p>
+                A module JAR whose manifest carries <code>OpenIDE-Module-Source: &lt;runtime id&gt;</code>
+                (plus the matching <code>OpenIDE-Module-Requires</code> token) is installed as a
+                <i>source-only module</i>: it ships the module's sources in place of compiled classes,
+                and a <i>source runtime</i> compiles or interprets them on demand when the module is
+                enabled and used. Cached compilation output and staleness detection (patched sources
+                or changed dependencies force recompilation) are handled by the module system.
+            </p>
+            <p>
+                Runtimes are regular modules: they provide the
+                <code>org.netbeans.modules.source.runtime.&lt;id&gt;</code> token and register an
+                implementation of the new <code>org.netbeans.SourceRuntime</code> SPI in
+                <code>META-INF/services</code>. The SPI supports bytecode-producing runtimes
+                (implement <code>build</code>) and interpreter-mode runtimes (implement
+                <code>createSourceLoader</code>, nothing is ever materialized to disk).
+            </p>
+        </description>
+        <class package="org.netbeans" name="SourceRuntime"/>
+    </change>
     <change id="bootstrap.filter">
         <api name="launcher"/>
         <summary>Can use classloader to check access to bootstrap classes</summary>
