@@ -402,6 +402,56 @@ public class SourceModuleTest extends SetupHid {
     }
 
     /**
+     * A harness-built JAR may ship Bundle.properties files that are PURELY
+     * generated (no handwritten original, no side-path copy) - annotation
+     * processor output merged into the JAR at build time. Those must not
+     * be extracted into the compile's source tree, or the processor hits
+     * duplicate keys ("key X is a duplicate of one from
+     * Bundle.properties") and every dependent module's compile fails
+     * against an empty cache directory. The marker declares the harness
+     * contract; extraction skips all plain-path bundles.
+     */
+    public void testGeneratedOnlyBundleNotExtracted() throws Exception {
+        Map<String,String> contents = new LinkedHashMap<>();
+        contents.put("org/foo/hyb/Src.java", // NOI18N
+                "package org.foo.hyb;\n" // NOI18N
+                + "import org.openide.util.NbBundle;\n"
+                + "@NbBundle.Messages(\"msg_x=XVal\")\n" // NOI18N
+                + "public class Src {\n"
+                + "  public static String msg() {\n"
+                + "    return NbBundle.getMessage(Src.class, \"msg_x\");\n" // NOI18N
+                + "  }\n"
+                + "}\n");
+        // A generated-only bundle as the ant build would ship it: the
+        // processor's own output, no handwritten original exists.
+        contents.put("org/foo/hyb/Bundle.properties", // NOI18N
+                "msg_x=XVal\n"); // NOI18N
+        // The harness marker (no side-path original for this bundle).
+        contents.put(SourceModule.SOURCE_BUNDLES_MARKER,
+                "plain-path Bundle.properties files are merged or generated copies\n");
+        Map<String,String> manifest = new HashMap<>();
+        manifest.put("OpenIDE-Module", "org.foo.hybmod"); // NOI18N
+        manifest.put("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
+        manifest.put("OpenIDE-Module-Source", "java"); // NOI18N
+        manifest.put("OpenIDE-Module-Requires", SourceRuntime.TOKEN_PREFIX + "java"); // NOI18N
+        File jar = new File(jars, "generated-bundle-module.jar"); // NOI18N
+        createJar(jar, contents, manifest);
+
+        ModuleManager mgr = newManager();
+        mgr.mutexPrivileged().enterWriteAccess();
+        try {
+            mgr.create(rtJar, null, false, true, false);
+            Module m = mgr.create(jar, null, false, false, false);
+            mgr.enable(new HashSet<Module>(Collections.singleton(m)));
+            // The compile must succeed and regenerate the bundle:
+            Class<?> c = m.getClassLoader().loadClass("org.foo.hyb.Src"); // NOI18N
+            assertEquals("XVal", c.getMethod("msg").invoke(null)); // NOI18N
+        } finally {
+            mgr.mutexPrivileged().exitWriteAccess();
+        }
+    }
+
+    /**
      * Concurrent first-use compiles from multiple threads: no deadlock
      * (compileLocks follow the dependency DAG and never wait on the
      * module manager mutex), and exactly one compilation wins.
@@ -713,9 +763,13 @@ public class SourceModuleTest extends SetupHid {
                 "msg_hand=HandValue\n"); // NOI18N
         // The harness ships the handwritten bundle under the side path for
         // the runtime compile's source tree, and the merged copy at the
-        // plain path for pre-compile serving:
+        // plain path for pre-compile serving. The marker emulates a
+        // harness-built JAR: plain-path bundles are merged/generated
+        // artifacts, never compile inputs.
         contents.put("META-INF/netbeans/source-bundles/org/foo/srcmod/Bundle.properties", // NOI18N
-                "msg_hand=HandValue\n"); // NOI18N
+                "msg_hand=HandValue\n");
+        contents.put(SourceModule.SOURCE_BUNDLES_MARKER,
+                "plain-path Bundle.properties files are merged or generated copies\n"); // NOI18N
         contents.put("org/foo/srcmod/resource.txt", // NOI18N
                 "some resource\n"); // NOI18N
         // A handwritten service registration at a non-annotation interface:

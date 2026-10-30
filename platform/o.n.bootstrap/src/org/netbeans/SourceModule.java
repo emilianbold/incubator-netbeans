@@ -90,6 +90,15 @@ class SourceModule extends StandardModule {
     /** Side path in hybrid JARs carrying the original handwritten bundles. */
     static final String SOURCE_BUNDLES_PREFIX = "META-INF/netbeans/source-bundles/"; // NOI18N
 
+    /**
+     * Marker a harness-built source JAR carries in the side path: every
+     * {@code Bundle.properties} at a plain path in that JAR is a merged or
+     * purely generated build artifact, never a compile input - the compile
+     * inputs are the side-path originals. Externally built source JARs
+     * carry no marker: their plain bundles are their originals.
+     */
+    static final String SOURCE_BUNDLES_MARKER = SOURCE_BUNDLES_PREFIX + ".merged-plain-bundles"; // NOI18N
+
     /** Set to compile at enablement instead of first use. */
     private static final String EAGER_PROP = "netbeans.source.modules.eager"; // NOI18N
 
