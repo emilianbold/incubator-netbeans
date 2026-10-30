@@ -362,6 +362,46 @@ public class SourceModuleTest extends SetupHid {
     }
 
     /**
+     * A pure or externally built module has no side-path bundle copies and
+     * no annotation processors: its plain {@code Bundle.properties} IS the
+     * handwritten original, and it must reach the compiled output - the
+     * NbBundle access pattern is class-relative, so it uses the class's
+     * own loader, which serves only the compiled output.
+     */
+    public void testExternalModulePlainBundleReachesOutput() throws Exception {
+        Map<String,String> contents = new LinkedHashMap<>();
+        contents.put("org/foo/extmod/Src.java", // NOI18N
+                "package org.foo.extmod;\n" // NOI18N
+                + "public class Src {\n"
+                + "  public static String msg() {\n"
+                + "    return org.openide.util.NbBundle.getMessage(Src.class, \"msg_ext\");\n" // NOI18N
+                + "  }\n"
+                + "}\n");
+        // No side-path copy: the plain bundle is the original (external shape).
+        contents.put("org/foo/extmod/Bundle.properties", // NOI18N
+                "msg_ext=ext-value\n"); // NOI18N
+        Map<String,String> manifest = new HashMap<>();
+        manifest.put("OpenIDE-Module", "org.foo.extmod"); // NOI18N
+        manifest.put("OpenIDE-Module-Specification-Version", "1.0"); // NOI18N
+        manifest.put("OpenIDE-Module-Source", "java"); // NOI18N
+        manifest.put("OpenIDE-Module-Requires", SourceRuntime.TOKEN_PREFIX + "java"); // NOI18N
+        File jar = new File(jars, "external-module.jar"); // NOI18N
+        createJar(jar, contents, manifest);
+
+        ModuleManager mgr = newManager();
+        mgr.mutexPrivileged().enterWriteAccess();
+        try {
+            mgr.create(rtJar, null, false, true, false);
+            Module m = mgr.create(jar, null, false, false, false);
+            mgr.enable(new HashSet<Module>(Collections.singleton(m)));
+            Class<?> c = m.getClassLoader().loadClass("org.foo.extmod.Src"); // NOI18N
+            assertEquals("ext-value", c.getMethod("msg").invoke(null)); // NOI18N
+        } finally {
+            mgr.mutexPrivileged().exitWriteAccess();
+        }
+    }
+
+    /**
      * Concurrent first-use compiles from multiple threads: no deadlock
      * (compileLocks follow the dependency DAG and never wait on the
      * module manager mutex), and exactly one compilation wins.
@@ -590,24 +630,26 @@ public class SourceModuleTest extends SetupHid {
     }
 
     /**
-     * Builds the Java-runtime provider module for the tests: the reference
-     * runtime for the engine's contract tests (see TestJavaRuntime),
+     * Builds the Java-runtime provider module for the tests: the real
+     * {@code org.netbeans.modules.source.java.JavaSourceRuntime} (from
+     * the test classpath - keep the test dependency on the
+     * {@code org.netbeans.modules.source.java} module in project.xml),
      * packaged as a module providing the java token through the same
      * service/token discovery production uses.
      */
     private static void makeJavaRuntimeModule(File jar) throws Exception {
-        byte[] rtClass = readClassBytes("org.foo.javart.TestJavaRuntime");
+        byte[] rtClass = readClassBytes("org.netbeans.modules.source.java.JavaSourceRuntime");
         Manifest mf = new Manifest();
         mf.getMainAttributes().putValue("Manifest-Version", "1.0");
         mf.getMainAttributes().putValue("OpenIDE-Module", "org.foo.javart"); // NOI18N
         mf.getMainAttributes().putValue("OpenIDE-Module-Specification-Version", "1.0");
-        mf.getMainAttributes().putValue("OpenIDE-Module-Public-Packages", "org.foo.javart.*"); // NOI18N
+        mf.getMainAttributes().putValue("OpenIDE-Module-Public-Packages", "org.netbeans.modules.source.java.*"); // NOI18N
         mf.getMainAttributes().putValue("OpenIDE-Module-Provides", SourceRuntime.TOKEN_PREFIX + "java"); // NOI18N
         try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(jar), mf)) {
             addJarEntry(jos, "META-INF/services/org.netbeans.SourceRuntime", // NOI18N
-                    "org.foo.javart.TestJavaRuntime\n" // NOI18N
+                    "org.netbeans.modules.source.java.JavaSourceRuntime\n" // NOI18N
                             .getBytes(StandardCharsets.UTF_8));
-            addJarEntry(jos, "org/foo/javart/TestJavaRuntime.class", rtClass);
+            addJarEntry(jos, "org/netbeans/modules/source/java/JavaSourceRuntime.class", rtClass);
         }
     }
 

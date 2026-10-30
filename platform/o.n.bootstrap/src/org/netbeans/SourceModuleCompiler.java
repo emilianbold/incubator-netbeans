@@ -46,7 +46,8 @@ import org.openide.modules.Places;
 /**
  * Drives on-demand compilation of source-only modules at enablement time.
  * Language-specific work is delegated to a {@link SourceRuntime} - always
- * provided by a module. This class is the
+ * provided by a module (the Java one ships as
+ * {@code org.netbeans.modules.source.java}). This class is the
  * language-agnostic machinery:
  * <p>
  * A source-only module is a regular module JAR whose manifest carries the
@@ -259,7 +260,7 @@ final class SourceModuleCompiler {
                 String name = entry.getName();
                 if (name.startsWith(SourceModule.SOURCE_BUNDLES_PREFIX)) {
                     name = name.substring(SourceModule.SOURCE_BUNDLES_PREFIX.length());
-                } else if (isSkippedAtExtraction(name)) {
+                } else if (isSkippedAtExtraction(name, jarFile)) {
                     continue;
                 }
                 File target = new File(targetDir, name);
@@ -281,20 +282,27 @@ final class SourceModuleCompiler {
         }
     }
 
-    /** Entries of a hybrid JAR that must not be extracted into the runtime
+    /** Entries of a JAR that must not be extracted into the runtime
      *  compilation's source tree: compiled classes, the manifest, the
-     *  generated namespace, and the merged Bundle.properties at their plain
-     *  paths (shipped for pre-compile serving only). The bundled handwritten
-     *  copies under {@link SourceModule#SOURCE_BUNDLES_PREFIX} ARE extracted -
-     *  into the source tree, where the processors read them exactly like the
-     *  ant build's src/ (reading the merged copies from the output location
+     *  generated namespace, and - for hybrid JARs - the merged
+     *  Bundle.properties at their plain paths (shipped for pre-compile
+     *  serving only). The bundled handwritten copies under
+     *  {@link SourceModule#SOURCE_BUNDLES_PREFIX} ARE extracted - into the
+     *  source tree, where the processors read them exactly like the ant
+     *  build's src/ (reading the merged copies from the output location
      *  instead would collide with the processors' own writes there: javac's
      *  Filer forbids reopening files it has written).
+     *  <p>
+     *  The plain-path Bundle.properties is skipped only when the JAR also
+     *  ships the original under the side path, i.e. the hybrid form. A
+     *  pure or externally built module has no side path: its plain bundle
+     *  IS the handwritten original and must be extracted.
      */
-    static boolean isSkippedAtExtraction(String name) {
+    static boolean isSkippedAtExtraction(String name, JarFile jar) {
         return MANIFEST_ENTRY.equals(name) // NOI18N
                 || name.endsWith(".class") // NOI18N
-                || name.endsWith("Bundle.properties") // NOI18N
+                || (name.endsWith("Bundle.properties") // NOI18N
+                    && jar.getEntry(SourceModule.SOURCE_BUNDLES_PREFIX + name) != null)
                 || SourceModule.isGeneratedNamespace(name);
     }
 

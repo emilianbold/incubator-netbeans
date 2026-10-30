@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.foo.javart;
+package org.netbeans.modules.source.java;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,18 +39,26 @@ import javax.tools.ToolProvider;
 import org.netbeans.SourceRuntime;
 
 /**
- * The reference Java runtime for the engine's contract tests: compiles
- * the module's sources with the system Java compiler (in-process
- * {@code javax.tools}), runs annotation processors from the dependency
- * JARs like an ant build would, and copies non-Java resources to the
- * output. Packaged by SourceModuleTest into a provider module that
- * declares the java token, so the tests exercise the full token/service
- * discovery. The production Java runtime is a module of its own; see
- * platform/source.java.
+ * The Java source runtime: compiles a source-only module's sources with
+ * the system Java compiler (in-process {@code javax.tools}), so NetBeans
+ * has to be executed on a JDK rather than a bare JRE. Annotation
+ * processors shipped inside the dependency module JARs are run exactly
+ * like during an ant build ({@code -proc:full}, no extra {@code -A}
+ * options), so everything the harness generates at build time -
+ * {@code META-INF/services/*} registrations,
+ * {@code META-INF/generated-layer.xml}, merged {@code Bundle.properties}
+ * files - is regenerated here.
+ * <p>
+ * This module is an ordinary autoload pulled in by the
+ * {@code org.netbeans.modules.source.runtime.java} token that every Java
+ * source module requires - the module system itself knows nothing
+ * special about Java, see {@link SourceRuntime}.
+ *
+ * @see SourceRuntime
  */
-public class TestJavaRuntime extends SourceRuntime {
+public class JavaSourceRuntime extends SourceRuntime {
 
-    private static final Logger LOG = Logger.getLogger(TestJavaRuntime.class.getName());
+    private static final Logger LOG = Logger.getLogger(JavaSourceRuntime.class.getName());
 
     /** Maximal number of compiler diagnostics reported in the exception message. */
     private static final int MAX_ERRORS = 20;
@@ -60,28 +68,38 @@ public class TestJavaRuntime extends SourceRuntime {
     }
 
     public @Override String getVersion() {
-        return "testrt/" + System.getProperty("java.version"); // NOI18N
+        return System.getProperty("java.version") + '/' + System.getProperty("java.vendor"); // NOI18N
     }
 
+    /**
+     * The Java build's output layout is exactly what the module system's
+     * lazy loader expects: hybrid JARs ship the build-time generated
+     * artifacts (which this runtime regenerates from the same sources)
+     * and class loads can be deferred to the first use.
+     */
     public @Override boolean supportsLazyCompilation() {
         return true;
     }
 
     public @Override void build(File srcDir, File outputDir, List<File> classpath) throws IOException {
+        // Handwritten resources reach the output directory, like the ant
+        // harness' resource copy before jarring:
         copyResources(srcDir, outputDir);
 
         List<File> sourceFiles = new ArrayList<>();
         findJavaFiles(srcDir, sourceFiles);
         if (sourceFiles.isEmpty()) {
+            // Resource-only module (e.g. a kit): nothing to compile.
             return;
         }
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) {
-            throw new IOException("No system Java compiler is available"); // NOI18N
+            throw new IOException(
+                "No system Java compiler is available. " // NOI18N
+                + "Run NetBeans with a JDK rather than a JRE, or convert the module to binary form."); // NOI18N
         }
 
-        String cp = SourceRuntime.joinPaths(classpath);
         List<String> options = new ArrayList<>();
         options.add("-d"); // NOI18N
         options.add(outputDir.getPath());
@@ -90,14 +108,28 @@ public class TestJavaRuntime extends SourceRuntime {
         options.add("-sourcepath"); // NOI18N
         options.add(srcDir.getPath());
         options.add("-classpath"); // NOI18N
-        options.add(cp);
-        // Processors are shipped inside the dependency JARs, exactly like
-        // in an ant build:
+        options.add(joinPaths(classpath));
+        // Note: modules compiling against javac internals (anything with
+        // the javacapi wrapper / nb-javac ext jars on its classpath) do not
+        // fit the runtime compile: the ant harness builds them with
+        // --limit-modules hiding jdk.compiler (SetupLimitModules), but
+        // replicating that in-process made javac pathologically slow
+        // (hundreds of seconds per module). Such modules must stay binary.
+        // Processors (layer generation, @ServiceProvider, @NbBundle.Messages, ...)
+        // are shipped inside the dependency JARs themselves, exactly like in
+        // an ant build - no -A options are used by the harness either.
         options.add("-processorpath"); // NOI18N
-        options.add(cp);
-        options.add("-proc:full"); // NOI18N
+        options.add(joinPaths(classpath));
+        if (supportsProcFull()) {
+            // JDK 23+ disables annotation processing by default; request it
+            // explicitly. The flag exists since JDK 21 (17.0.9 backport).
+            options.add("-proc:full"); // NOI18N
+        }
         options.add("-encoding"); // NOI18N
         options.add("UTF-8"); // NOI18N
+        // Debug info, like the harness' build.compiler.debug/debuglevel
+        // (source,lines,vars): without it, debugging a source module
+        // shows no local variables.
         options.add("-g"); // NOI18N
         options.add("-nowarn"); // NOI18N
 
@@ -143,6 +175,19 @@ public class TestJavaRuntime extends SourceRuntime {
         return sb.toString();
     }
 
+    private static boolean supportsProcFull() {
+        Runtime.Version v = Runtime.version();
+        return v.feature() > 21
+                || (v.feature() == 21)
+                || (v.feature() == 17 && v.update() >= 9)
+                || (v.feature() == 11 && v.update() >= 21);
+    }
+
+    /**
+     * Copies resources (everything that is not a Java source) from the
+     * source tree into the output directory, mirroring what the ant
+     * harness does before jarring a module.
+     */
     private static void copyResources(File srcDir, File classesDir) throws IOException {
         File[] kids = srcDir.listFiles();
         if (kids == null) {

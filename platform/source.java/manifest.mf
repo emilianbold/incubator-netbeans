@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+OpenIDE-Module: org.netbeans.modules.source.java
+OpenIDE-Module-Specification-Version: 1.0
+OpenIDE-Module-Provides: org.netbeans.modules.source.runtime.java
+OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/source/java/Bundle.properties

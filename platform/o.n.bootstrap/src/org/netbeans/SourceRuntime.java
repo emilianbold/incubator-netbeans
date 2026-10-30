@@ -44,7 +44,9 @@ import java.util.List;
  *
  * and registers its implementation in
  * {@code META-INF/services/org.netbeans.SourceRuntime} (the implementation
- * should live in a public package of the provider module).
+ * should live in a public package of the provider module). The Java
+ * runtime ({@code id = "java"}) ships with the Platform as the
+ * {@code org.netbeans.modules.source.java} module.
  * <p>
  * The module system takes care of everything language-agnostic: caching
  * and staleness detection (including the runtime {@link #getVersion}),

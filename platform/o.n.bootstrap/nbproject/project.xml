@@ -67,6 +67,10 @@
                         <compile-dependency/>
                     </test-dependency>
                     <test-dependency>
+                        <code-name-base>org.netbeans.modules.source.java</code-name-base>
+                        <compile-dependency/>
+                    </test-dependency>
+                    <test-dependency>
                         <code-name-base>org.netbeans.libs.junit4</code-name-base>
                         <compile-dependency/>
                     </test-dependency>
@@ -103,6 +107,7 @@
                 <friend>org.netbeans.modules.sendopts</friend>
                 <friend>org.netbeans.modules.settings</friend>
                 <friend>com.oracle.jdeveloper.extcache</friend>
+                <friend>org.netbeans.modules.source.java</friend>
                 <package>org.netbeans</package>
             </friend-packages>
         </data>
