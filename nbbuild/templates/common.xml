@@ -77,6 +77,64 @@
             <available file="${module.auto.deps.xml}"/>
         </condition>
         <property name="jar-excludes" value="**/*.java,**/*.form,**/package.html,**/doc-files/"/>
+        <!-- Support for source-only modules (compiled on demand by the module
+             system at runtime, see platform/o.n.bootstrap SourceModule):
+             set is.source.module=true in nbproject/project.properties and add
+             to manifest.mf:
+               OpenIDE-Module-Source: java
+               OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
+             The Requires token makes the module system enable the Java
+             source runtime module (org.netbeans.modules.source.java) first;
+             runtimes are ordinary modules, the module system is
+             language-agnostic.
+
+             By default the module is packaged in HYBRID form: compiled
+             classes (as before, for build-time dependents) plus the full
+             source tree. The runtime ignores the packaged classes and always
+             compiles from source - so patched sources are picked up - but
+             other not-yet-converted modules can still compile against this
+             one at build time.
+
+             Once no binary module depends on this one anymore (leaf of the
+             dependency graph, or all dependents converted), additionally set
+             source.module.pure=true: the build then skips compilation
+             completely and packages sources + resources only.
+
+             Set source.module.compile=true to force build-time compilation
+             for verification even in pure mode (classes are not packaged). -->
+        <property name="is.source.module" value="false"/>
+        <condition property="source.module.pack">
+            <istrue value="${is.source.module}"/>
+        </condition>
+        <condition property="binary.module.pack">
+            <isfalse value="${is.source.module}"/>
+        </condition>
+        <property name="source.module.pure" value="false"/>
+        <property name="source.module.compile" value="false"/>
+        <condition property="source.module.hybrid.pack">
+            <and>
+                <istrue value="${is.source.module}"/>
+                <isfalse value="${source.module.pure}"/>
+            </and>
+        </condition>
+        <condition property="source.module.pure.pack">
+            <and>
+                <istrue value="${is.source.module}"/>
+                <istrue value="${source.module.pure}"/>
+            </and>
+        </condition>
+        <condition property="source.module.needs.compile">
+            <or>
+                <istrue value="${source.module.compile}"/>
+                <istrue value="${source.module.hybrid.pack}"/>
+            </or>
+        </condition>
+        <condition property="source.module.skip.compile">
+            <and>
+                <istrue value="${is.source.module}"/>
+                <isfalse value="${source.module.needs.compile}"/>
+            </and>
+        </condition>
         <property name="module.jar.verifylinkageignores" value=""/>
         <property name="cp.extra" value=""/>
         <tstamp>
@@ -211,7 +269,15 @@
     <extension-point name="-pre-compile" depends="init,up-to-date"/>
     <extension-point name="-post-compile" depends="-pre-compile,-do-compile"/>
     <target name="compile" depends="-pre-compile,-do-compile,-post-compile"/>
-    <target name="-do-compile" depends="init,up-to-date,-pre-compile" unless="is.jar.uptodate">
+    <target name="-check-compile" depends="up-to-date">
+        <condition property="compile.disabled">
+            <or>
+                <isset property="is.jar.uptodate"/>
+                <isset property="source.module.skip.compile"/>
+            </or>
+        </condition>
+    </target>
+    <target name="-do-compile" depends="init,up-to-date,-pre-compile,-check-compile" unless="compile.disabled">
         <mkdir dir="${build.classes.dir}"/>
         <depend srcdir="${src.dir}" destdir="${build.classes.dir}" cache="${build.dir}/depcache">
             <classpath refid="cp"/>
@@ -272,7 +338,122 @@
     <extension-point name="-pre-jar" depends="init,compile,jar-prep"/>
     <extension-point name="-post-jar" depends="-pre-jar,-do-jar"/>
     <target name="jar" depends="-pre-jar,-do-jar,-post-jar"/>
-    <target name="-do-jar" depends="init,compile,jar-prep,-pre-jar" unless="is.jar.uptodate">
+    <!-- Source modules are compiled by the JDK the IDE runs on: the runtime
+         compiler cannot honor javac.release / javac.compilerargs (they live
+         in nbproject/project.properties, which is not packaged). javac.release
+         still serves pure modules: JarWithModuleAttributes generates the
+         manifest's OpenIDE-Module-Java-Dependencies floor from it during
+         jarring, and that floor IS enforced at runtime; the bytecode-floor
+         aspect is moot because no bytecode ships. Compiler ARGUMENTS that
+         change compilation semantics would silently diverge from the ant
+         build, so the harness refuses them outright: processor options,
+         add-exports/opens/reads, explicit processor selection, proc modes,
+         XD internals, enable-preview. Werror and Xlint variants only affect
+         warnings and are allowed (the runtime compile passes -nowarn;
+         bytecode is identical). -->
+    <target name="-source-module-settings-check" if="source.module.pack" depends="init">
+        <condition property="source.module.bad.args">
+            <or>
+                <matches string="${javac.compilerargs} ${javac.add.compilerargs}" pattern="(^|\s)-A[^=\s]*="/>
+                <matches string="${javac.compilerargs} ${javac.add.compilerargs}" pattern="(^|\s)--add-(exports|opens|reads)\s"/>
+                <matches string="${javac.compilerargs} ${javac.add.compilerargs}" pattern="(^|\s)(-processor|-processorpath|-processoronly)\s"/>
+                <matches string="${javac.compilerargs} ${javac.add.compilerargs}" pattern="(^|\s)-proc:(only|full)\b"/>
+                <matches string="${javac.compilerargs} ${javac.add.compilerargs}" pattern="(^|\s)-XD"/>
+                <matches string="${javac.compilerargs} ${javac.add.compilerargs}" pattern="(^|\s)--enable-preview\b"/>
+            </or>
+        </condition>
+        <fail if="source.module.bad.args"
+              message="Module ${code.name.base} is a source module (is.source.module=true) but uses compiler arguments that the runtime compiler cannot honor (${javac.compilerargs} ${javac.add.compilerargs}). Runtime compilation would silently diverge from the ant build: remove them, or keep the module binary."/>
+        <!-- The manifest contract: the runtime id must be declared, and its
+             token required, so the module system enables the runtime
+             module before this one. -->
+        <condition property="source.module.runtime.id" value="java">
+            <or>
+                <equals arg1="${is.source.module}" arg2="true"/>
+                <not><isset property="is.source.module"/></not>
+            </or>
+        </condition>
+        <property name="source.module.runtime.id" value="${is.source.module}"/>
+        <loadfile property="source.module.manifest.text" srcFile="${manifest.mf}"/>
+        <condition property="source.module.bad.header">
+            <not>
+                <matches string="${source.module.manifest.text}" multiline="true"
+                         pattern="^OpenIDE-Module-Source:[ \t]*(true|${source.module.runtime.id})[ \t]*\r?$"/>
+            </not>
+        </condition>
+        <fail if="source.module.bad.header"
+              message="Module ${code.name.base} is a source module (is.source.module=${is.source.module}) but its manifest.mf does not declare OpenIDE-Module-Source: ${source.module.runtime.id}. Add the header (and OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.${source.module.runtime.id}, see below), or set is.source.module=false."/>
+        <condition property="source.module.bad.token">
+            <not>
+                <matches string="${source.module.manifest.text}"
+                         pattern="OpenIDE-Module-Requires:(?:[^\n]|\n[ \t])*org\.netbeans\.modules\.source\.runtime\.${source.module.runtime.id}(?![\w.])"/>
+            </not>
+        </condition>
+        <fail if="source.module.bad.token"
+              message="Module ${code.name.base} is a source module (OpenIDE-Module-Source: ${source.module.runtime.id}) but its manifest.mf does not require the token org.netbeans.modules.source.runtime.${source.module.runtime.id}. The module system needs that requirement to enable the runtime module first: add OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.${source.module.runtime.id} (merged with any existing tokens on the same, comma-separated, header)."/>
+    </target>
+
+    <target name="-do-jar" depends="init,compile,jar-prep,-pre-jar,-do-jar-source-pure,-do-jar-source-hybrid,-do-jar-binary" unless="is.jar.uptodate"/>
+    <!-- Build hint for source modules: tells the module system whether the
+         annotation processors generated a layer, so that modules without
+         generated layers can answer the eager startup layer lookup without
+         compiling at all (lazy compilation). Pure modules are not compiled
+         at build time, so their hint is conservatively "unknown". -->
+    <target name="-source-module-hints" if="source.module.pack" depends="init,-source-module-settings-check">
+        <mkdir dir="${build.dir}/source-hints/META-INF"/>
+        <!-- Also carry the ORIGINAL handwritten bundles under a side path:
+             the runtime compile needs them as source-path input (bundle
+             merging and layer verification read them there, exactly like
+             the ant build), while the merged bundles shipped at their
+             plain paths are only served pre-compile. -->
+        <mkdir dir="${build.dir}/source-bundles/META-INF/netbeans/source-bundles"/>
+        <copy todir="${build.dir}/source-bundles/META-INF/netbeans/source-bundles">
+            <fileset dir="${src.dir}" includes="**/Bundle.properties"/>
+        </copy>
+        <condition property="source.module.layer.hint" value="layer=true">
+            <and>
+                <isfalse value="${source.module.pure}"/>
+                <available file="${build.classes.dir}/META-INF/generated-layer.xml"/>
+            </and>
+        </condition>
+        <condition property="source.module.layer.hint" value="layer=unknown">
+            <istrue value="${source.module.pure}"/>
+        </condition>
+        <property name="source.module.layer.hint" value="layer=false"/>
+        <echo file="${build.dir}/source-hints/META-INF/generated-layer.hint" message="${source.module.layer.hint}"/>
+    </target>
+    <target name="-do-jar-source-pure" depends="init,compile,jar-prep,-pre-jar,-source-module-hints" if="source.module.pure.pack" unless="is.jar.uptodate">
+        <!-- Pure source-only module: no classes at all, just the src/ tree
+             (sources + resources). Only safe when no binary module depends
+             on this one. The manifest must carry OpenIDE-Module-Source: true;
+             everything else (deps, spec version, ...) is computed as usual.
+             The module system compiles this JAR on demand at runtime.
+             The side-path handwritten bundles ship here too (no generated
+             artifacts exist to serve, but the compile still needs them). -->
+        <jarwithmoduleattributes jarfile="${cluster}/${module.jar}" compress="${build.package.compress}" index="${build.package.index}" manifest="${manifest.mf}" stamp="${cluster}/.lastModified">
+            <fileset dir="${src.dir}" excludes="**/*.form,**/package.html,**/doc-files/"/>
+            <fileset dir="${build.dir}/source-hints"/>
+            <fileset dir="${build.dir}/source-bundles"/>
+        </jarwithmoduleattributes>
+    </target>
+    <target name="-do-jar-source-hybrid" depends="init,compile,jar-prep,-pre-jar,-source-module-hints" if="source.module.hybrid.pack" unless="is.jar.uptodate">
+        <!-- Hybrid source module: the full build output (classes, resources,
+             and generated artifacts: layer, service registrations, merged
+             bundles, processor registrations) plus the complete source tree.
+             The runtime serves the generated artifacts straight from the JAR
+             (they are derived from the same sources it will compile, and the
+             staleness stamp invalidates them together), deferring compilation
+             until the module's classes are first needed; its own runtime
+             compile never sees the shipped copies (extractSources skips the
+             generated namespace) and regenerates authoritative ones. -->
+        <jarwithmoduleattributes jarfile="${cluster}/${module.jar}" compress="${build.package.compress}" index="${build.package.index}" manifest="${manifest.mf}" stamp="${cluster}/.lastModified">
+            <fileset dir="${build.classes.dir}"/>
+            <fileset dir="${src.dir}" includes="**/*.java"/>
+            <fileset dir="${build.dir}/source-hints"/>
+            <fileset dir="${build.dir}/source-bundles"/>
+        </jarwithmoduleattributes>
+    </target>
+    <target name="-do-jar-binary" depends="init,compile,jar-prep,-pre-jar" if="binary.module.pack" unless="is.jar.uptodate">
         <!-- This task adds some or all of: -Public-Packages, -Friends, Class-Path, -IDE-Dependencies, -Module-Dependencies, -Specification-Version, -Implementation-Version, -Build-Version, AutoUpdate-Show-In-Client -->
         <jarwithmoduleattributes jarfile="${cluster}/${module.jar}" compress="${build.package.compress}" index="${build.package.index}" manifest="${manifest.mf}" stamp="${cluster}/.lastModified">
             <fileset dir="${build.classes.dir}"/>

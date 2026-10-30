@@ -450,6 +450,12 @@ metabuild.hash=${metabuild.hash}</echo>
        </condition>
   </target>
   <target name="finish-build" depends="finish-build-platform,finish-build-nb"/>
+
+  <target name="trim-source-modules" depends="bootstrap" description="Strip compiled classes from source-only module JARs of the built clusters (post-build packaging step).">
+    <java classname="org.netbeans.nbbuild.TrimSourceModules" classpath="${nbantext.jar}" failonerror="true">
+      <arg value="${netbeans.dest.dir}"/>
+    </java>
+  </target>
   <target name="finish-build-platform" depends="init,-check-nb-cluster" unless="has.nb.cluster">
     <copy file="../platform/o.n.bootstrap/readme/README-bin.txt" tofile="${netbeans.dest.dir}/README.txt" overwrite="true"/>
     <fixcrlf eol="lf" srcdir="${netbeans.dest.dir}" >
