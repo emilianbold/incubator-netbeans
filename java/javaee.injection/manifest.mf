@@ -3,4 +3,6 @@ OpenIDE-Module: org.netbeans.modules.javaee.injection
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/javaee/injection/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.41
 AutoUpdate-Show-In-Client: false
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

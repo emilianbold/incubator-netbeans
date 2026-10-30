@@ -3,3 +3,5 @@ AutoUpdate-Show-In-Client: false
 OpenIDE-Module: org.netbeans.modules.gradle.java.coverage
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/gradle/java/coverage/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.28
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

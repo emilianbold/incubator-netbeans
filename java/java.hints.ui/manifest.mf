@@ -4,4 +4,6 @@ OpenIDE-Module: org.netbeans.modules.java.hints.ui
 OpenIDE-Module-Implementation-Version: 1
 OpenIDE-Module-Layer: org/netbeans/modules/java/hints/spiimpl/layer.xml
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/java/hints/ui/Bundle.properties
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

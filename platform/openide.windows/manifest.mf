@@ -3,4 +3,6 @@ OpenIDE-Module: org.openide.windows
 OpenIDE-Module-Specification-Version: 6.112
 OpenIDE-Module-Localizing-Bundle: org/openide/windows/Bundle.properties
 AutoUpdate-Essential-Module: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

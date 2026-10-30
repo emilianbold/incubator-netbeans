@@ -3,4 +3,6 @@ OpenIDE-Module: org.netbeans.modules.sampler
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/sampler/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.49
 Main-Class: org.netbeans.modules.sampler.CLISampler
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

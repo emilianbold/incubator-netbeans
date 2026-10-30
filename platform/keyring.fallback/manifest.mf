@@ -3,4 +3,6 @@ AutoUpdate-Show-In-Client: false
 OpenIDE-Module: org.netbeans.modules.keyring.fallback
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/keyring/fallback/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.43
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

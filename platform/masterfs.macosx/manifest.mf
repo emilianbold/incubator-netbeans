@@ -2,6 +2,8 @@ Manifest-Version: 1.0
 OpenIDE-Module: org.netbeans.modules.masterfs.macosx
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/masterfs/watcher/macosx/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.48
-OpenIDE-Module-Requires: org.openide.modules.os.MacOSX
+OpenIDE-Module-Requires: org.openide.modules.os.MacOSX,
+ org.netbeans.modules.source.runtime.java
 OpenIDE-Module-Provides: org.netbeans.modules.masterfs.providers.Notifier
+OpenIDE-Module-Source: java
 

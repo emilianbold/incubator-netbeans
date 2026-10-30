@@ -5,5 +5,7 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/applemenu/Bundle.properti
 OpenIDE-Module-Install: org/netbeans/modules/applemenu/Install.class
 OpenIDE-Module-Layer: org/netbeans/modules/applemenu/layer.xml
 OpenIDE-Module-Specification-Version: 1.72
-OpenIDE-Module-Requires: org.openide.modules.os.MacOSX
+OpenIDE-Module-Requires: org.openide.modules.os.MacOSX,
+ org.netbeans.modules.source.runtime.java
+OpenIDE-Module-Source: java
 

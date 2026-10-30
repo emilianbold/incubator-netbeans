@@ -3,4 +3,6 @@ OpenIDE-Module: org.openide.dialogs
 OpenIDE-Module-Specification-Version: 7.82
 OpenIDE-Module-Localizing-Bundle: org/openide/Bundle.properties
 AutoUpdate-Essential-Module: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

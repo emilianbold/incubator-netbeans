@@ -4,6 +4,8 @@ OpenIDE-Module: org.netbeans.modules.debugger.jpda.jsui/1
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/debugger/jpda/jsui/Bundle.properties
 OpenIDE-Module-Layer: org/netbeans/modules/debugger/jpda/jsui/layer.xml
 OpenIDE-Module-Specification-Version: 1.35
-OpenIDE-Module-Requires: org.netbeans.spi.debugger.ui
+OpenIDE-Module-Requires: org.netbeans.spi.debugger.ui,
+ org.netbeans.modules.source.runtime.java
 OpenIDE-Module-Package-Dependencies: com.sun.jdi[VirtualMachineManager]
+OpenIDE-Module-Source: java
 

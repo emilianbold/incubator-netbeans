@@ -6,3 +6,5 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/debugger/jpda/truffle/nod
 OpenIDE-Module-Specification-Version: 1.32
 OpenIDE-Module-Recommends: org.netbeans.modules.debugger.jpda.truffle
 OpenIDE-Module-Package-Dependencies: com.sun.jdi[VirtualMachineManager]
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

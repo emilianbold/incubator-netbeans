@@ -3,4 +3,6 @@ OpenIDE-Module: org.netbeans.modules.templatesui
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/templatesui/Bundle.properties
 OpenIDE-Module-Provides: org.netbeans.api.templates.wizard
 OpenIDE-Module-Specification-Version: 1.38
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

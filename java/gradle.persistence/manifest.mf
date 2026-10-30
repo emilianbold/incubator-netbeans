@@ -3,3 +3,5 @@ AutoUpdate-Show-In-Client: false
 OpenIDE-Module: org.netbeans.modules.gradle.persistence
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/gradle/persistence/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.31
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

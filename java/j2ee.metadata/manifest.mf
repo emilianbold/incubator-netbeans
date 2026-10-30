@@ -3,3 +3,5 @@ OpenIDE-Module: org.netbeans.modules.j2ee.metadata/0
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/j2ee/metadata/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.67
 AutoUpdate-Show-In-Client: false
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

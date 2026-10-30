@@ -3,4 +3,6 @@ OpenIDE-Module: org.netbeans.swing.laf.dark/1
 OpenIDE-Module-Implementation-Version: 2
 OpenIDE-Module-Install: org/netbeans/swing/laf/dark/Installer.class
 OpenIDE-Module-Localizing-Bundle: org/netbeans/swing/laf/dark/Bundle.properties
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

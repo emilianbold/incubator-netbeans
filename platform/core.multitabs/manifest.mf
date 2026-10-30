@@ -5,3 +5,5 @@ OpenIDE-Module-Implementation-Version: 1
 OpenIDE-Module-Layer: org/netbeans/core/multitabs/layer.xml
 OpenIDE-Module-Localizing-Bundle: org/netbeans/core/multitabs/Bundle.properties
 OpenIDE-Module-Provides: org.netbeans.swing.tabcontrol.customtabs.TabbedComponentFactory
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

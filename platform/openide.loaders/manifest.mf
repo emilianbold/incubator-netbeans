@@ -5,4 +5,6 @@ OpenIDE-Module-Localizing-Bundle: org/openide/loaders/Bundle.properties
 OpenIDE-Module-Provides: org.netbeans.modules.templates.v1_0
 OpenIDE-Module-Layer: org/netbeans/modules/openide/loaders/layer.xml
 AutoUpdate-Essential-Module: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

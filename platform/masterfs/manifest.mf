@@ -6,4 +6,6 @@ OpenIDE-Module-Provides: org.openide.filesystems.FileUtil.toFileObject
 AutoUpdate-Show-In-Client: false
 AutoUpdate-Essential-Module: true
 OpenIDE-Module-Implementation-Version: 2
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

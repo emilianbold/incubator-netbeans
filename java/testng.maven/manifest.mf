@@ -4,3 +4,5 @@ OpenIDE-Module: org.netbeans.modules.testng.maven
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/testng/maven/Bundle.properties
 OpenIDE-Module-Provides: org.netbeans.modules.testng.maven.MavenTestNGSupport
 OpenIDE-Module-Specification-Version: 2.51
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

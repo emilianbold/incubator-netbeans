@@ -4,4 +4,6 @@ OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/java/project/Bundle.prope
 OpenIDE-Module-Needs: javax.script.ScriptEngine.freemarker
 OpenIDE-Module-Specification-Version: 1.107
 AutoUpdate-Show-In-Client: false
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

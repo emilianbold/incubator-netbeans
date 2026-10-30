@@ -3,4 +3,6 @@ OpenIDE-Module: org.netbeans.modules.maven.persistence/1
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/maven/persistence/Bundle.properties
 AutoUpdate-Show-In-Client: false
 OpenIDE-Module-Specification-Version: 1.64
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

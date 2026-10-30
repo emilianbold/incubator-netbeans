@@ -2,4 +2,6 @@ OpenIDE-Module: org.netbeans.modules.sendopts/2
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/sendopts/Bundle.properties
 OpenIDE-Module-Specification-Version: 2.71
 AutoUpdate-Essential-Module: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 

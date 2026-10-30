@@ -3,3 +3,5 @@ OpenIDE-Module: org.netbeans.modules.core.kit
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/core/kit/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.66
 AutoUpdate-Essential-Module: true
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java

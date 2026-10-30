@@ -4,4 +4,6 @@ OpenIDE-Module: org.netbeans.api.scripting
 OpenIDE-Module-Localizing-Bundle: org/netbeans/api/scripting/Bundle.properties
 OpenIDE-Module-Specification-Version: 1.32
 OpenIDE-Module-Recommends: org.netbeans.spi.scripting.EngineProvider
+OpenIDE-Module-Source: java
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
 
