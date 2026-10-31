@@ -107,6 +107,7 @@
                 <friend>org.netbeans.modules.sendopts</friend>
                 <friend>org.netbeans.modules.settings</friend>
                 <friend>com.oracle.jdeveloper.extcache</friend>
+                <friend>org.netbeans.modules.source.groovy</friend>
                 <friend>org.netbeans.modules.source.java</friend>
                 <package>org.netbeans</package>
             </friend-packages>
