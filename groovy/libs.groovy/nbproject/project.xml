@@ -30,6 +30,7 @@
                 <friend>org.netbeans.modules.groovy.editor</friend>
                 <friend>org.netbeans.modules.groovy.refactoring</friend>
                 <friend>org.netbeans.modules.groovy.support</friend>
+                <friend>org.netbeans.modules.source.groovy</friend>
                 <package>groovy.beans</package>
                 <package>groovy.cli</package>
                 <package>groovy.grape</package>
