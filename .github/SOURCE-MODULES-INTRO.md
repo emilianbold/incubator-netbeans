@@ -24,3 +24,8 @@ the build), compiled by the IDE itself on first launch - 127 on-demand
 compiles with zero failures, and zero recompiles on the next start. Run
 it on a JDK (the in-process `javax.tools` compiler needs one), and try
 `unzip -l` on any of the JARs listed in the build log.
+
+The distribution also carries a Groovy demo: `source.groovy.demo` is a
+module whose JAR contains nothing but `.groovy` sources - the Groovy
+source runtime interprets them in memory at every startup. Look for
+`GROOVY-SOURCE-DEMO` in `var/log/messages.log` after the first launch.

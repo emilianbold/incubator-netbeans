@@ -1,0 +1,8 @@
+Manifest-Version: 1.0
+OpenIDE-Module: org.netbeans.modules.source.groovy.demo
+OpenIDE-Module-Specification-Version: 1.0
+OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/source/groovy/demo/Bundle.properties
+OpenIDE-Module-Module-Dependencies: org.netbeans.modules.libs.groovy > 2.35
+OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.groovy
+OpenIDE-Module-Source: groovy
+OpenIDE-Module-Install: org/netbeans/modules/source/groovy/demo/Installer.class
