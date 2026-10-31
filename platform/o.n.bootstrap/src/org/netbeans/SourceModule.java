@@ -747,6 +747,21 @@ class SourceModule extends StandardModule {
                     return jarEntries.contains(name) ? jarUrl(name) : null;
                 }
             }
+            if (name.endsWith(".class")) { // NOI18N
+                // A class-file resource lookup is a class load in disguise:
+                // some frameworks probe class existence via
+                // getResource("Foo.class") instead of Class.forName (the
+                // debugger API does). Answer it like one: compile if needed
+                // and serve from the compiled output - never the packaged
+                // build-time classes, which may be stale for a patched
+                // module (and do not exist at all in a pure JAR).
+                try {
+                    ensureCompiled();
+                } catch (IOException ex) {
+                    return null;
+                }
+                return realLoader().getResource(name);
+            }
             // Present in the source JAR? Serve it verbatim - the compile
             // would copy the same bytes into its output anyway.
             if (jarEntries.contains(name)) {
@@ -777,6 +792,16 @@ class SourceModule extends StandardModule {
                 return jarEntries.contains(name)
                         ? java.util.Collections.enumeration(java.util.Collections.singleton(jarUrl(name)))
                         : java.util.Collections.<URL>emptyEnumeration();
+            }
+            if (name.endsWith(".class")) { // NOI18N
+                // See findResource: a class-file lookup is a class load in
+                // disguise - compile and enumerate the authoritative output.
+                try {
+                    ensureCompiled();
+                } catch (IOException ex) {
+                    return java.util.Collections.emptyEnumeration();
+                }
+                return realLoader().getResources(name);
             }
             if (jarEntries.contains(name)) {
                 return java.util.Collections.enumeration(java.util.Collections.singleton(jarUrl(name)));
