@@ -25,6 +25,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
@@ -359,6 +360,32 @@ public class SourceModuleTest extends SetupHid {
         assertTrue("handwritten registration not enumerable post-compile",
                 loader.getResources(svc).hasMoreElements());
         assertEquals("org.foo.srcmod.Src", readResource(loader, svc).trim()); // NOI18N
+    }
+
+    /**
+     * A class-file resource lookup is a class load in disguise: some
+     * frameworks probe class existence via {@code getResource("Foo.class")}
+     * instead of {@code Class.forName} (the debugger API does). It must
+     * trigger the compile and serve the compiled output - never a packaged
+     * build-time copy, which would be stale for a patched module.
+     */
+    public void testClassFileResourceLookupCompilesAndServesOutput() throws Exception {
+        ModuleManager mgr = newManager();
+        Module srcMod = enableSourceModule(mgr);
+        ClassLoader loader = srcMod.getClassLoader();
+        // Not compiled yet: the lookup must compile and resolve.
+        String res = "org/foo/srcmod/Src.class"; // NOI18N
+        URL url = loader.getResource(res);
+        assertNotNull("class-file resource must resolve (compiling if needed)", url);
+        assertTrue("must come from the compiled output: " + url, // NOI18N
+                url.toExternalForm().contains("source-modules"));
+        assertTrue("the lookup must have compiled the module", cacheMarker().isFile());
+        // Still resolves after the compile, from the same source of truth:
+        assertNotNull(loader.getResource(res));
+        assertTrue(loader.getResources(res).hasMoreElements());
+        // A class that does not exist answers null/empty:
+        assertNull(loader.getResource("org/foo/srcmod/Nope.class")); // NOI18N
+        assertFalse(loader.getResources("org/foo/srcmod/Nope.class").hasMoreElements()); // NOI18N
     }
 
     /**
