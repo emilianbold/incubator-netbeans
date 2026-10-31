@@ -103,6 +103,10 @@
              Set source.module.compile=true to force build-time compilation
              for verification even in pure mode (classes are not packaged). -->
         <property name="is.source.module" value="false"/>
+        <!-- Runtime id for non-Java source modules (e.g. groovy, see the
+             SourceRuntime providers); the matching OpenIDE-Module-Source
+             header and token requirement are verified at build time. -->
+        <property name="source.module.runtime" value="java"/>
         <condition property="source.module.pack">
             <istrue value="${is.source.module}"/>
         </condition>
@@ -367,13 +371,7 @@
         <!-- The manifest contract: the runtime id must be declared, and its
              token required, so the module system enables the runtime
              module before this one. -->
-        <condition property="source.module.runtime.id" value="java">
-            <or>
-                <equals arg1="${is.source.module}" arg2="true"/>
-                <not><isset property="is.source.module"/></not>
-            </or>
-        </condition>
-        <property name="source.module.runtime.id" value="${is.source.module}"/>
+        <property name="source.module.runtime.id" value="${source.module.runtime}"/>
         <loadfile property="source.module.manifest.text" srcFile="${manifest.mf}"/>
         <condition property="source.module.bad.header">
             <not>
