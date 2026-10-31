@@ -99,7 +99,7 @@ jobs:
           n=$(for j in nbbuild/netbeans/*/modules/*.jar; do
                 c=$(unzip -l "$j" 2>/dev/null | grep -c '\.class$' || true)
                 s=$(unzip -l "$j" 2>/dev/null | grep -c '\.java$' || true)
-                [ "$c" = "0" ] && [ "$s" -gt 0 ] && echo x
+                if [ "$c" = "0" ] && [ "$s" -gt 0 ]; then echo x; fi
               done | wc -l)
           echo "== $n module JARs in this build ship as pure source code"
 
