@@ -4,5 +4,3 @@ OpenIDE-Module: org.netbeans.modules.java.source.compat8
 OpenIDE-Module-Localizing-Bundle: org/netbeans/modules/java/source/compat8/Bundle.properties
 OpenIDE-Module-Specification-Version: 9.38
 OpenIDE-Module-Fragment-Host: org.netbeans.modules.java.source.base
-OpenIDE-Module-Source: java
-OpenIDE-Module-Requires: org.netbeans.modules.source.runtime.java
